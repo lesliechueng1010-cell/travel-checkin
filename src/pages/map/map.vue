@@ -37,13 +37,18 @@
       📍 定位显示你在 <text class="brand-text">{{ locCity.name }}</text>（约 {{ locCity.dist }}km）· 去打卡 →
     </view>
 
-    <!-- 底部面板 -->
+    <!-- 底部可折叠抽屉：默认收起只露标题栏，展开高度不超过 40vh（地图至少保留 60%） -->
     <view class="bottom-sheet" :class="{ open: sheetOpen }">
-      <view class="sheet-handle" @tap="sheetOpen = !sheetOpen">
-        <text class="sheet-title">{{ viewMode === 'nation' ? '各省进度（点亮城市数 / 总数）' : curProv + ' · 城市列表' }}</text>
-        <text class="tiny">{{ sheetOpen ? '收起 ▾' : '展开 ▴' }}</text>
+      <view class="sheet-handle" @tap="toggleSheet">
+        <view class="handle-left">
+          <text class="sheet-title">{{ sheetTitle }}</text>
+          <text class="sheet-summary">{{ sheetSummary }}</text>
+        </view>
+        <view class="handle-right">
+          <text class="sheet-arrow" :class="{ rotate: sheetOpen }">▴</text>
+        </view>
       </view>
-      <scroll-view scroll-y class="sheet-body">
+      <scroll-view scroll-y class="sheet-body" :class="{ show: sheetOpen }">
         <view v-if="viewMode === 'nation'">
           <view class="prov-row" v-for="p in st.provinces" :key="p.prov" @tap="drill(p.prov)">
             <view class="row">
@@ -74,6 +79,8 @@ import store from '../../core/store.js';
 import { PROVINCES, CITIES, citiesOfProv, searchCity, findCity } from '../../data/cities.js';
 import { locateCity } from '../../core/logic.js';
 
+const SHEET_KEY = 'tf.mapSheetOpen';
+
 const ICON = {
   visited: '/static/icons/dot_green.png',
   wish: '/static/icons/dot_orange.png',
@@ -83,13 +90,18 @@ const ICON = {
   provDone: '/static/icons/dot_green.png'
 };
 
-const PROV_SHORT = {
-  '北京市': '北京', '天津市': '天津', '上海市': '上海', '重庆市': '重庆',
-  '内蒙古自治区': '内蒙古', '广西壮族自治区': '广西', '西藏自治区': '西藏',
-  '宁夏回族自治区': '宁夏', '新疆维吾尔自治区': '新疆',
-  '香港特别行政区': '香港', '澳门特别行政区': '澳门', '台湾省': '台湾'
+/* 全国视图气泡用单字简称 + 数字，缓解中部气泡重叠 */
+const PROV_ABBR = {
+  '北京市': '京', '天津市': '津', '上海市': '沪', '重庆市': '渝',
+  '河北省': '冀', '山西省': '晋', '辽宁省': '辽', '吉林省': '吉', '黑龙江省': '黑',
+  '江苏省': '苏', '浙江省': '浙', '安徽省': '皖', '福建省': '闽', '江西省': '赣', '山东省': '鲁',
+  '河南省': '豫', '湖北省': '鄂', '湖南省': '湘', '广东省': '粤', '海南省': '琼',
+  '四川省': '川', '贵州省': '贵', '云南省': '滇', '陕西省': '陕', '甘肃省': '甘', '青海省': '青',
+  '内蒙古自治区': '蒙', '广西壮族自治区': '桂', '西藏自治区': '藏',
+  '宁夏回族自治区': '宁', '新疆维吾尔自治区': '新',
+  '香港特别行政区': '港', '澳门特别行政区': '澳', '台湾省': '台'
 };
-const provShort = p => PROV_SHORT[p] || p.replace(/省$/, '');
+const provAbbr = p => PROV_ABBR[p] || p.replace(/省|市|自治区|特别行政区|壮族|回族|维吾尔|区$/g, '');
 
 export default {
   data() {
@@ -122,6 +134,17 @@ export default {
         return av - bv || a.name.localeCompare(b.name, 'zh');
       });
     },
+    sheetTitle() {
+      return this.viewMode === 'nation' ? '各省进度' : this.curProv + ' · 城市列表';
+    },
+    sheetSummary() {
+      if (this.viewMode === 'nation') {
+        return '已点亮 ' + this.st.visitedCount + '/' + this.st.total + ' 城 · ' + this.st.pct + '%';
+      }
+      const list = this.provCities;
+      const done = list.filter(c => this.visited[c.name]).length;
+      return done + '/' + list.length + ' 城已打卡';
+    },
     markers() {
       if (this.viewMode === 'nation') {
         return PROVINCES.map((p, i) => {
@@ -132,7 +155,10 @@ export default {
           return {
             id: i, latitude: cap.lat, longitude: cap.lng, iconPath: icon, width: 20, height: 20,
             joinCluster: false,
-            callout: { content: provShort(p) + ' ' + done + '/' + cities.length, display: 'ALWAYS', fontSize: 10, borderRadius: 6, bgColor: '#10161F', color: '#E8EDF2', padding: 4 }
+            callout: {
+              content: provAbbr(p) + ' ' + done + '/' + cities.length,
+              display: 'ALWAYS', fontSize: 9, borderRadius: 4, bgColor: '#10161F', color: '#E8EDF2', padding: 2
+            }
           };
         });
       }
@@ -146,11 +172,19 @@ export default {
       });
     }
   },
+  onLoad() {
+    // 记住用户上一次的展开 / 收起状态
+    try { const v = uni.getStorageSync(SHEET_KEY); if (v === '1') this.sheetOpen = true; } catch (e) {}
+  },
   onShow() {
     this.refresh();
     this.tryLocate();
   },
   methods: {
+    toggleSheet() {
+      this.sheetOpen = !this.sheetOpen;
+      try { uni.setStorageSync(SHEET_KEY, this.sheetOpen ? '1' : '0'); } catch (e) {}
+    },
     refresh() {
       const s = store.get();
       this.visited = s.visited;
@@ -229,11 +263,26 @@ export default {
 .bottom-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
   background: #10161F; border-radius: 28rpx 28rpx 0 0; border-top: 1rpx solid #232D3B;
-  max-height: 56vh; display: flex; flex-direction: column;
+  max-height: 40vh; display: flex; flex-direction: column; overflow: hidden;
 }
-.sheet-handle { padding: 22rpx 28rpx; display: flex; justify-content: space-between; align-items: center; }
+.sheet-handle {
+  flex: 0 0 auto; max-height: 8vh; padding: 16rpx 28rpx;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.handle-left { display: flex; flex-direction: column; gap: 2rpx; min-width: 0; }
 .sheet-title { font-size: 26rpx; color: #E8EDF2; font-weight: 600; }
-.sheet-body { flex: 1; max-height: 48vh; padding: 0 28rpx 30rpx; }
+.sheet-summary { font-size: 20rpx; color: #A8B3BF; }
+.handle-right { flex: 0 0 auto; padding-left: 16rpx; }
+.sheet-arrow {
+  display: inline-block; font-size: 24rpx; color: #A8B3BF;
+  transition: transform .28s ease, opacity .2s ease; opacity: .9;
+}
+.sheet-arrow.rotate { transform: rotate(180deg); }
+.sheet-body {
+  flex: 1 1 auto; max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height .28s ease, opacity .22s ease;
+}
+.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 28rpx 30rpx; }
 .prov-row { padding: 16rpx 0; }
 .prov-name { font-size: 26rpx; color: #E8EDF2; }
 .city-row { padding: 22rpx 0; border-bottom: 1rpx solid #1B2432; }

@@ -2,16 +2,17 @@
   "name": "行走健将",
   "appid": "",
   "description": "全国地图城市打卡 · 攻略 · 串线行程",
-  "versionName": "1.0.0",
-  "versionCode": "100",
+  "versionName": "1.0.1",
+  "versionCode": "101",
   "vueVersion": "3",
   "mp-weixin": {
-    "appid": "",
+    "appid": "wxf5e2a3b6ec07826c",
     "setting": {
       "urlCheck": false,
       "es6": true,
       "minified": true
     },
+    "lazyCodeLoading": "requiredComponents",
     "usingComponents": true,
     "requiredPrivateInfos": ["getLocation"],
     "permission": {

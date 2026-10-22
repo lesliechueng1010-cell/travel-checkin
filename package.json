@@ -1,6 +1,6 @@
 {
   "name": "travel-footprint",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "旅行足迹打卡 · 微信小程序（uni-app Vue3）",
