@@ -93,7 +93,7 @@
           confirm-type="search"
           @input="onPickSearch"
         />
-        <scroll-view scroll-y class="sheet-list">
+        <scroll-view scroll-y :show-scrollbar="true" class="sheet-list">
           <view v-if="pickKw.trim()">
             <view v-if="!pickResults.length" class="empty">没找到这个城市</view>
             <view class="pick-line" v-for="c in pickResults" :key="c.name" @tap="togglePick(c.name)">
@@ -291,7 +291,8 @@ export default {
 }
 .sheet {
   position: absolute; left: 0; right: 0; bottom: 0;
-  max-height: 78vh; display: flex; flex-direction: column;
+  /* 1.3.1：弹层改为固定高度，让内部 scroll-view 能拿到确定高度 */
+  height: 86vh; display: flex; flex-direction: column;
   background: rgba(9, 30, 52, 0.98);
   border-radius: 32rpx 32rpx 0 0;
   border-top: 1rpx solid rgba(245, 240, 230, 0.16);
@@ -306,7 +307,9 @@ export default {
   border-radius: 999rpx; padding: 18rpx 28rpx;
   font-size: 27rpx; color: #F2EDE3;
 }
-.sheet-list { flex: 1 1 auto; min-height: 200rpx; margin-top: 18rpx; }
+/* 1.3.1：max-height 容器里 scroll-view 拿不到确定高度（真机滑不动），
+   改为固定高容器 + height:0 的 flex 子项撑满剩余空间 */
+.sheet-list { flex: 1; height: 0; min-height: 0; margin-top: 18rpx; }
 .group-title {
   font-size: 24rpx; font-weight: 600; color: #D9B36A;
   margin: 22rpx 6rpx 10rpx;

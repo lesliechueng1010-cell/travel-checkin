@@ -488,6 +488,12 @@ assert('我的页：最近足迹 / 成就徽章 / 导入入口齐备',
   mySrc.includes('最近足迹') && mySrc.includes('成就徽章') && mySrc.includes('导入历史足迹'));
 const importSrc = readFileSync(new URL('../src/pages/import/import.vue', import.meta.url), 'utf8');
 const tripSrc = readFileSync(new URL('../src/pages/trip/trip.vue', import.meta.url), 'utf8');
+// 行程页样式块提取（只取 <style> 里的规则，避免模板 class 干扰）
+const tripBlock = sel => {
+  const re = new RegExp(sel.replace(/[.-]/g, m => '\\' + m) + '\\s*\\{([^}]*)\\}');
+  const m = tripSrc.match(re);
+  return m ? m[1] : '';
+};
 assert('补录页：明示照片不上传', importSrc.includes('照片本体绝不上传'));
 assert('补录页：单次最多 20 张', /count\s*[=:]\s*20/.test(importSrc));
 
@@ -512,7 +518,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.3.0 / 130', manifestSrc.versionName === '1.3.0' && manifestSrc.versionCode === '130');
+assert('版本：1.3.1 / 131', manifestSrc.versionName === '1.3.1' && manifestSrc.versionCode === '131');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -664,5 +670,25 @@ assert('1.3.0 搜索过滤：城市名关键词直达（喀什）',
 assert('1.3.0 搜索过滤：无直达时别名兜底（香格里拉 → 迪庆）',
   searchCity('香格里拉').length === 1 && searchCity('香格里拉')[0].prov === '云南省');
 assert('1.3.0 行程页：里程/天数计算入口未动', /tripMileage/.test(tripSrc) && /suggestDays/.test(tripSrc));
+
+// 28. 1.3.1 行程页弹层放大 + 列表滚动修复
+const sheetCss131 = tripBlock('.sheet');
+const sheetListCss131 = tripBlock('.sheet-list');
+assert('1.3.1 弹层：高度改为固定 86vh（不再是 max-height）',
+  /height:\s*86vh/.test(sheetCss131) && !/max-height/.test(sheetCss131),
+  `sheet: ${JSON.stringify(sheetCss131.trim())}`);
+assert('1.3.1 弹层：仍是纵向 flex 容器（配合高度撑满）',
+  /display:\s*flex/.test(sheetCss131) && /flex-direction:\s*column/.test(sheetCss131));
+assert('1.3.1 列表：flex:1 + height:0 + min-height:0（真机可滚的关键）',
+  /flex:\s*1(;|\s|$)/.test(sheetListCss131) && /height:\s*0(;|\s|$)/.test(sheetListCss131) &&
+  /min-height:\s*0(;|\s|$)/.test(sheetListCss131) && !/min-height:\s*200rpx/.test(sheetListCss131),
+  `sheet-list: ${JSON.stringify(sheetListCss131.trim())}`);
+assert('1.3.1 列表：scroll-view 显式开启滚动条',
+  /<scroll-view[^>]*scroll-y[^>]*:show-scrollbar="true"/.test(tripSrc));
+assert('1.3.1 搜索框与过滤逻辑未动',
+  tripSrc.includes('placeholder="搜城市名或省份名，如：大理 / 云南"') &&
+  /@input="onPickSearch"/.test(tripSrc) &&
+  /const kw = \(this\.pickKw \|\| ''\)\.trim\(\)/.test(tripSrc) &&
+  /CITIES\.filter\(c => c\.name\.includes\(kw\) \|\| c\.prov\.includes\(kw\)\)/.test(tripSrc));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
