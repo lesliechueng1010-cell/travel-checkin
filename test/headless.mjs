@@ -98,4 +98,16 @@ assert('取消打卡', !store.get().visited['北京'] && store.getStats().visite
 // 12. 数据持久化到 storage
 assert('数据持久化', typeof mem['tf_data_v1'] === 'object' && mem['tf_data_v1'].visited['天津']);
 
+// 13. 用户资料（头像 + 昵称）
+let p0 = store.getProfile();
+assert('资料初始为空', p0.avatar === '' && p0.nickname === '');
+const saved = store.setProfile({ avatar: '/tmp/avatar.png', nickname: '行走的小明' });
+assert('资料可写入', saved.avatar === '/tmp/avatar.png' && saved.nickname === '行走的小明');
+assert('资料带更新时间戳', saved.updatedAt > 0);
+const tooLong = store.setProfile({ nickname: '这是一段非常非常非常非常非常长的昵称超过二十个字了吧' });
+assert('昵称超长自动截断到 20 字', tooLong.nickname.length === 20);
+store.setProfile({ nickname: '小明' });
+assert('资料可再更新', store.getProfile().nickname === '小明');
+assert('资料随数据持久化', (mem['tf_data_v1'] || {}).profile && mem['tf_data_v1'].profile.nickname === '小明');
+
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

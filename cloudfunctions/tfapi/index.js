@@ -30,6 +30,29 @@ exports.main = async (event) => {
       return { ok: true };
     }
 
+    if (action === 'updateProfile') {
+      const p = event.profile || {};
+      const payload = {
+        profile: {
+          avatar: String(p.avatar || ''),
+          nickname: String(p.nickname || '').slice(0, 20),
+          updatedAt: p.updatedAt || Date.now()
+        }
+      };
+      const r = await db.collection('footprints').where({ _openid: OPENID }).limit(1).get();
+      if (r.data.length) {
+        await db.collection('footprints').doc(r.data[0]._id).update(payload);
+      } else {
+        await db.collection('footprints').add({ data: { _openid: OPENID, profile: payload.profile } });
+      }
+      return { ok: true };
+    }
+
+    if (action === 'getProfile') {
+      const r = await db.collection('footprints').where({ _openid: OPENID }).limit(1).get();
+      return { ok: true, profile: (r.data.length && r.data[0].profile) ? r.data[0].profile : null };
+    }
+
     if (action === 'getGuide') {
       const r = await db.collection('guides').where({ city: event.city }).limit(1).get();
       return { ok: true, guide: r.data.length ? r.data[0].guide : null };

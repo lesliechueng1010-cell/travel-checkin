@@ -57,4 +57,25 @@ export async function fetchGuide(cityName) {
   } catch (e) { return null; }
 }
 
-export default { isCloud, login, pull, push, fetchGuide };
+/**
+ * 用户资料云端同步（按 openid 隔离）
+ * 云可用时写 tfapi.updateProfile；未配置云环境或失败时静默返回 null，
+ * 资料本身仍存本地 setProfile 的持久化数据。
+ */
+export async function pushProfile(profile) {
+  if (!isCloud()) return null;
+  try {
+    const r = await cloudCall('tfapi', { action: 'updateProfile', profile });
+    return r;
+  } catch (e) { return null; }
+}
+
+export async function pullProfile() {
+  if (!isCloud()) return null;
+  try {
+    const r = await cloudCall('tfapi', { action: 'getProfile' });
+    return r.profile || null;
+  } catch (e) { return null; }
+}
+
+export default { isCloud, login, pull, push, fetchGuide, pushProfile, pullProfile };

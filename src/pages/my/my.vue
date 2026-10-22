@@ -1,17 +1,46 @@
 <template>
   <view class="page">
-    <!-- 用户卡 -->
-    <view class="card">
-      <view class="row">
-        <view>
-          <text class="h2">{{ logged ? '微信用户' : '未登录' }}</text>
-          <text class="tiny" style="display:block;margin-top:6rpx">{{ idText }}</text>
-        </view>
-        <button class="btn sm primary" @tap="doLogin">{{ logged ? '已登录' : '微信一键登录' }}</button>
+    <!-- 用户资料卡（头像 + 昵称，走微信官方「头像昵称填写」能力） -->
+    <view class="card profile-card">
+      <!-- 头像：open-type=chooseAvatar 由微信官方唤起选头像/相册 -->
+      <button
+        class="avatar-btn"
+        open-type="chooseAvatar"
+        @chooseavatar="onChooseAvatar"
+      >
+        <image v-if="profile.avatar" :src="profile.avatar" class="avatar" mode="aspectFill" />
+        <view v-else class="avatar avatar-empty">👤</view>
+      </button>
+
+      <view class="profile-info">
+        <!-- 昵称：type=nickname 点击即带出微信昵称，可手动修改 -->
+        <input
+          v-if="editingNick"
+          class="nick-input"
+          type="nickname"
+          :value="profile.nickname"
+          placeholder="点击填写昵称"
+          maxlength="20"
+          focus
+          @blur="onNickBlur"
+          @input="onNickInput"
+          @confirm="onNickConfirm"
+        />
+        <text v-else class="h2 nick-text" @tap="startEditNick">
+          {{ profile.nickname || '点击设置头像昵称' }}
+        </text>
+        <text class="tiny nick-tip" v-if="!profile.nickname">
+          点头像选微信头像 / 相册图，点上方文字填昵称（不支持读取，仅限用户主动填写）
+        </text>
+        <text class="tiny nick-tip" v-else>点昵称可直接修改</text>
+        <text class="tiny" style="display:block;margin-top:6rpx">{{ idText }}</text>
       </view>
-      <view class="notice" style="margin-top:16rpx">
-        {{ cloudOn ? '☁️ 已连接云开发，足迹数据按微信账号（openid）隔离存储。' : '📍 本地演示模式：数据保存在本机。配置云开发环境后自动云端同步（见 README）。' }}
-      </view>
+
+      <button class="btn sm primary" @tap="doLogin">{{ logged ? '已登录' : '微信一键登录' }}</button>
+    </view>
+
+    <view class="notice" style="margin:0 24rpx 20rpx">
+      {{ cloudOn ? '☁️ 已连接云开发，足迹与资料按微信账号（openid）隔离存储。' : '📍 本地演示模式：资料与足迹保存在本机。配置云开发环境后自动云端同步（见 README）。' }}
     </view>
 
     <!-- 足迹统计 -->
@@ -76,17 +105,73 @@ export default {
       recent: [],
       cached: 0,
       cloudOn: false,
+      profile: { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 },
+      editingNick: false,
+      nickDraft: '',
       DISCLAIMER: SAFETY_DISCLAIMER
     };
   },
-  onShow() {
+  async onShow() {
     this.refresh();
     this.cloudOn = api.isCloud();
+    this.loadProfile();
+    await this.syncRemoteProfile();
     const saved = uni.getStorageSync('tf_openid');
     this.logged = !!(saved && saved !== 'local-user');
     if (this.logged) this.idText = 'openid: ' + String(saved).slice(0, 8) + '****（已云端隔离存储）';
   },
   methods: {
+    loadProfile() {
+      this.profile = Object.assign({ avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 }, store.getProfile());
+    },
+    /* 云端有更新的资料时按 openid 拉回本地 */
+    async syncRemoteProfile() {
+      if (!api.isCloud()) return;
+      try {
+        const remote = await api.pullProfile();
+        if (remote && (remote.updatedAt || 0) > (this.profile.updatedAt || 0)) {
+          store.setProfile({ avatar: remote.avatar || '', nickname: remote.nickname || '', syncedAt: Date.now() });
+          this.loadProfile();
+        }
+      } catch (e) {}
+    },
+    /* 微信官方头像选择回调：detail.avatarUrl 为临时路径，转存本地永久目录 */
+    onChooseAvatar(e) {
+      const url = e.detail && e.detail.avatarUrl;
+      if (!url) return;
+      uni.saveFile({
+        tempFilePath: url,
+        success: res => {
+          store.setProfile({ avatar: res.savedFilePath });
+          this.loadProfile();
+          uni.showToast({ title: '头像已更新', icon: 'success' });
+        },
+        fail: () => {
+          // 转存失败则退回临时路径（本次会话可用）
+          store.setProfile({ avatar: url });
+          this.loadProfile();
+          uni.showToast({ title: '头像已更新（临时）', icon: 'none' });
+        }
+      });
+    },
+    startEditNick() {
+      this.nickDraft = this.profile.nickname || '';
+      this.editingNick = true;
+    },
+    onNickInput(e) { this.nickDraft = e.detail.value || ''; },
+    onNickBlur() { this.commitNick(); },
+    onNickConfirm() { this.commitNick(); },
+    commitNick() {
+      const name = String(this.nickDraft || '').trim().slice(0, 20);
+      this.editingNick = false;
+      if (name && name !== this.profile.nickname) {
+        store.setProfile({ nickname: name });
+        this.loadProfile();
+        uni.showToast({ title: '昵称已保存', icon: 'success' });
+      } else {
+        this.loadProfile();
+      }
+    },
     refresh() {
       this.st = store.getStats();
       const s = store.get();
@@ -159,6 +244,26 @@ export default {
 </script>
 
 <style scoped>
+.profile-card { display: flex; flex-direction: row; align-items: center; gap: 24rpx; }
+.avatar-btn {
+  width: 120rpx; height: 120rpx; padding: 0; margin: 0; flex: 0 0 120rpx;
+  background: transparent; border: none; line-height: 0; overflow: visible;
+}
+.avatar-btn::after { border: none; }
+.avatar {
+  width: 120rpx; height: 120rpx; border-radius: 60rpx;
+  background: #1A2230; border: 1rpx solid #2C3948;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44rpx; color: #5C6B7D;
+}
+.avatar-empty { color: #5C6B7D; }
+.profile-info { flex: 1; min-width: 0; }
+.nick-text { display: block; font-size: 32rpx; color: #E8EDF2; }
+.nick-input {
+  background: #0E141D; border: 1rpx solid #2C3948; border-radius: 12rpx;
+  padding: 12rpx 18rpx; font-size: 30rpx; color: #E8EDF2; width: 100%;
+}
+.nick-tip { display: block; font-size: 20rpx; color: #7C8896; margin-top: 6rpx; line-height: 1.5; }
 .stats-hero { display: flex; gap: 20rpx; }
 .hero-item { flex: 1; background: #10161F; border-radius: 16rpx; padding: 22rpx; text-align: center; }
 .hero-num { display: block; font-size: 42rpx; font-weight: 800; color: #22C55E; margin-bottom: 8rpx; }

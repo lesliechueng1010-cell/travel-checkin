@@ -12,7 +12,10 @@ let state = {
   wishlist: [], // [城市名]
   trips: [],    // [{ id, name, cities: [城市名] }]
   openid: '',
-  lastLoc: null
+  lastLoc: null,
+  // 用户资料：头像为本地永久文件路径，昵称来自微信「头像昵称填写」能力
+  // updatedAt 用于云端合并，syncedAt 记录上次云端同步时间（开通云开发后按 openid 同步）
+  profile: { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 }
 };
 
 const subs = [];
@@ -31,6 +34,37 @@ function persist() {
 }
 
 export function get() { return state; }
+
+/* 迁移：旧数据没有 profile 时补齐，避免读到 undefined */
+function migrate() {
+  if (!state.profile || typeof state.profile !== 'object') {
+    state.profile = { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 };
+  }
+  ['avatar', 'nickname'].forEach(k => { if (typeof state.profile[k] !== 'string') state.profile[k] = ''; });
+  ['updatedAt', 'syncedAt'].forEach(k => { if (typeof state.profile[k] !== 'number') state.profile[k] = 0; });
+}
+
+export function getProfile() {
+  migrate();
+  return state.profile;
+}
+
+/**
+ * 保存用户资料（头像 / 昵称）
+ * 头像 filePath 会用 uni.saveFile 落到本地永久目录，避免临时路径失效
+ */
+export function setProfile(patch = {}) {
+  migrate();
+  if (typeof patch.avatar === 'string') state.profile.avatar = patch.avatar;
+  if (typeof patch.nickname === 'string') state.profile.nickname = patch.nickname.trim().slice(0, 20);
+  state.profile.updatedAt = Date.now();
+  if (patch.syncedAt) state.profile.syncedAt = patch.syncedAt;
+  persist();
+  // 云端可用时按 openid 同步（api 层内部判断是否已配置云环境）
+  try { api.pushProfile && api.pushProfile(state.profile); } catch (e) {}
+  emit();
+  return state.profile;
+}
 
 export async function boot() {
   load();
@@ -98,4 +132,4 @@ export function setLastLoc(loc) {
 
 export function getStats() { return stats(state.visited); }
 
-export default { get, boot, checkin, uncheckin, toggleWish, saveTrip, removeTrip, setLastLoc, getStats, subscribe };
+export default { get, boot, checkin, uncheckin, toggleWish, saveTrip, removeTrip, setLastLoc, getStats, subscribe, getProfile, setProfile };
