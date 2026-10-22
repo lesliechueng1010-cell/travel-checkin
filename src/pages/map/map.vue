@@ -12,8 +12,8 @@
       @markertap="onMarkerTap"
     />
 
-    <!-- 顶部统计栏 · 毛玻璃悬浮卡 -->
-    <view class="stats-bar">
+    <!-- 顶部统计栏 · 毛玻璃悬浮卡（下移量按胶囊按钮实测底部动态计算） -->
+    <view class="stats-bar" :style="{ paddingTop: statsTop + 'rpx' }">
       <view class="stats-inner">
         <view class="stat-main">
           <view class="stat-num-wrap">
@@ -35,13 +35,15 @@
       </view>
     </view>
 
-    <!-- 定位打卡提示 -->
-    <view class="loc-banner" v-if="locCity && !visited[locCity.name]" @tap="goDetail(locCity.name)">
+    <!-- 定位打卡提示（随统计卡一起下移，保持固定间距） -->
+    <view class="loc-banner" :style="{ top: (statsTop + 162) + 'rpx' }" v-if="locCity && !visited[locCity.name]" @tap="goDetail(locCity.name)">
       📍 定位显示你在 <text class="brand-text">{{ locCity.name }}</text>（约 {{ locCity.dist }}km）· 去打卡 →
     </view>
 
     <!-- 底部可折叠抽屉：默认收起只露标题栏，展开高度不超过 40vh（地图至少保留 60%） -->
     <view class="bottom-sheet" :class="{ open: sheetOpen }">
+      <!-- 顶部居中拖拽横条 -->
+      <view class="sheet-grab"></view>
       <view class="sheet-handle" @tap="toggleSheet">
         <view class="handle-left">
           <view class="sheet-title-row">
@@ -60,6 +62,7 @@
         <view v-if="viewMode === 'nation'">
           <view class="prov-row" v-for="p in st.provinces" :key="p.prov" @tap="drill(p.prov)">
             <view class="prov-head">
+              <view class="prov-pin"></view>
               <text class="prov-name">{{ p.prov }}</text>
               <text class="prov-count">{{ p.visited }}/{{ p.total }}</text>
               <text class="prov-arrow">›</text>
@@ -103,6 +106,8 @@ export default {
       st: { visitedCount: 0, total: 0, pct: 0, provDone: 0, provinces: [] },
       locCity: null,
       sheetOpen: false,
+      // 顶部避让量（rpx）：统计卡距屏幕顶部的距离，onLoad 时按胶囊按钮实测位置动态计算
+      statsTop: 70,
       showSearch: false,
       kw: '',
       polyline: []
@@ -169,6 +174,7 @@ export default {
   onLoad() {
     // 记住用户上一次的展开 / 收起状态
     try { const v = uni.getStorageSync(SHEET_KEY); if (v === '1') this.sheetOpen = true; } catch (e) {}
+    this.computeStatsTop();
   },
   onShow() {
     this.refresh();
@@ -178,6 +184,25 @@ export default {
     toggleSheet() {
       this.sheetOpen = !this.sheetOpen;
       try { uni.setStorageSync(SHEET_KEY, this.sheetOpen ? '1' : '0'); } catch (e) {}
+    },
+    /* 统计卡顶部避让：优先用右上角胶囊按钮实测底部 + 16rpx；
+       取不到胶囊信息时兜底为「状态栏高度 + 96rpx」。结果统一换算成 rpx 交给样式。 */
+    computeStatsTop() {
+      let sys = {};
+      try { sys = uni.getSystemInfoSync() || {}; } catch (e) {}
+      const winW = sys.windowWidth || 375;
+      const rpx2px = winW / 750;
+      const toRpx = px => Math.round(px / rpx2px);
+      let bottomPx = 0;
+      try {
+        if (typeof wx !== 'undefined' && wx.getMenuButtonBoundingClientRect) {
+          const rect = wx.getMenuButtonBoundingClientRect();
+          if (rect && rect.bottom > 0) bottomPx = rect.bottom;
+        }
+      } catch (e) { bottomPx = 0; }
+      this.statsTop = bottomPx > 0
+        ? toRpx(bottomPx + 16 * rpx2px)
+        : toRpx(sys.statusBarHeight || 20) + 96;
     },
     refresh() {
       const s = store.get();
@@ -234,7 +259,8 @@ export default {
 .map-page { position: relative; height: 100vh; overflow: hidden; }
 .the-map { width: 100%; height: 100vh; }
 
-/* 顶部统计卡 · 玻璃大圆角 + 香槟金大数字 */
+/* 顶部统计卡 · 玻璃大圆角 + 香槟金大数字
+   padding-top 由内联样式按胶囊按钮实测位置动态给出（兜底值见 data.statsTop） */
 .stats-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 5;
   padding: 70rpx 24rpx 12rpx;
@@ -319,8 +345,17 @@ export default {
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 -12rpx 40rpx rgba(0, 0, 0, 0.34);
 }
+/* 顶部居中拖拽横条 */
+.sheet-grab {
+  flex: 0 0 auto;
+  width: 64rpx; height: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.25);
+  margin: 14rpx auto 0;
+}
+/* 标题栏加了拖拽横条、标题也放大到 30rpx，不再用 8vh 硬性封顶，避免内容被压缩 */
 .sheet-handle {
-  flex: 0 0 auto; max-height: 8vh; padding: 20rpx 28rpx;
+  flex: 0 0 auto; padding: 16rpx 28rpx 20rpx;
   display: flex; justify-content: space-between; align-items: center;
 }
 .handle-left { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
@@ -328,7 +363,7 @@ export default {
 .sheet-icon { flex: 0 0 auto; font-size: 22rpx; color: #D9B36A; }
 .sheet-title {
   flex: 0 1 auto; min-width: 0;
-  font-size: 26rpx; color: #F2EDE3; font-weight: 600;
+  font-size: 30rpx; color: #F2EDE3; font-weight: 700;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .sheet-summary {
@@ -359,20 +394,36 @@ export default {
 }
 .sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 24rpx 32rpx; overflow-x: hidden; }
 
-/* 省份行 · 独立圆角玻璃卡（行距 12rpx）
+/* 省份行 · 全胶囊玻璃卡（行距 12rpx）
    布局沿用 1.0.4 的绝对定位：计数 position:absolute 钉右，脱离文档流、宽度固定，
-   任何屏宽都不会被挤出屏幕；省名给计数与行尾箭头预留固定空间，超出单行省略。 */
+   任何屏宽都不会被挤出屏幕；省名给计数与行尾箭头预留固定空间，超出单行省略。
+   1.1.1：胶囊形（999rpx）+ 提亮填充 + 悬浮阴影，省名前加金色定位针。 */
 .prov-row {
   position: relative;
-  padding: 20rpx 22rpx;
+  padding: 24rpx 36rpx;
   margin-bottom: 12rpx;
-  border-radius: 24rpx;
-  background: rgba(245, 240, 230, 0.055);
-  border: 1rpx solid rgba(245, 240, 230, 0.10);
+  border-radius: 999rpx;
+  background: rgba(150, 180, 215, 0.16);
+  border: 1rpx solid rgba(235, 242, 250, 0.28);
+  box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.25);
   overflow: hidden;
 }
 .prov-row:last-child { margin-bottom: 0; }
-.prov-head { position: relative; }
+.prov-head { position: relative; padding-left: 44rpx; }
+/* 金色定位针：圆底 + 左下尖角，旋转 45° 成针形，中心挖深蓝小孔 */
+.prov-pin {
+  position: absolute; left: 0; top: 50%; margin-top: -15rpx;
+  width: 30rpx; height: 30rpx;
+  background: #D9B36A;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 0 12rpx rgba(217, 179, 106, 0.45);
+}
+.prov-pin::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 10rpx; height: 10rpx; margin: -5rpx 0 0 -5rpx;
+  border-radius: 50%; background: rgba(10, 30, 52, 0.85);
+}
 .prov-name {
   display: block; margin-right: 168rpx;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
@@ -381,14 +432,15 @@ export default {
 .prov-count {
   position: absolute; right: 40rpx; top: 50%; transform: translateY(-50%);
   width: 110rpx; text-align: right; white-space: nowrap;
-  font-size: 22rpx; color: rgba(242, 237, 227, 0.55);
+  font-size: 22rpx; color: #FFFFFF; font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .prov-arrow {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%);
-  font-size: 26rpx; color: #D9B36A; line-height: 1;
+  font-size: 26rpx; color: #FFFFFF; line-height: 1;
 }
-.prov-row .bar { margin-top: 16rpx; height: 8rpx; }
+/* 进度条留在胶囊内下部，右端与计数列左缘对齐（36 padding + 40 + 110 = 186rpx，故 150rpx） */
+.prov-row .bar { margin-top: 16rpx; height: 8rpx; margin-right: 150rpx; }
 
 /* 省视图城市行：同样绝对定位钉右，城市名预留 90rpx，右侧徽标/箭头永不被挤掉 */
 .city-row {

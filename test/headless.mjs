@@ -354,7 +354,7 @@ assert('定位条：改为整行左右各 24rpx + 单行省略',
   /text-overflow:\s*ellipsis/.test(locBannerCss));
 // 预算：最宽数字 "100/100"（7 字符）在最窄剩余空间下仍完整可见
 const widestCount = 7 * 0.55 * 22;          // rpx，22rpx 字号按 0.55em/字符估
-const gapRpx = 16, nameMinRpx = 40, innerRpx = 750 - 56;
+const gapRpx = 16, nameMinRpx = 40, innerRpx = 750 - 72;   // 1.1.1 胶囊行左右内边距各 36rpx
 [320, 375, 430].forEach(w => {
   const r = w / 750;
   const need = (widestCount + gapRpx + nameMinRpx) * r;
@@ -391,6 +391,40 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.1.0 / 110', manifestSrc.versionName === '1.1.0' && manifestSrc.versionCode === '110');
+assert('版本：1.1.1 / 111', manifestSrc.versionName === '1.1.1' && manifestSrc.versionCode === '111');
+
+// 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
+const provRowCss111 = block('.prov-row');
+const provPinCss = block('.prov-pin');
+const provArrowCss = block('.prov-arrow');
+const barCss111 = block('.prov-row .bar');
+const grabCss = block('.sheet-grab');
+const sheetTitleCss = block('.sheet-title');
+assert('1.1.1 省行：全胶囊形（999rpx）+ 左右内边距 36rpx + 行距 12rpx',
+  /border-radius:\s*999rpx/.test(provRowCss111) && /padding:\s*24rpx\s+36rpx/.test(provRowCss111) &&
+  /margin-bottom:\s*12rpx/.test(provRowCss111));
+assert('1.1.1 省行：提亮填充 + 提亮描边 + 悬浮阴影',
+  /background:\s*rgba\(150,\s*180,\s*215,\s*0\.16\)/.test(provRowCss111) &&
+  /border:\s*1rpx\s+solid\s+rgba\(235,\s*242,\s*250,\s*0\.28\)/.test(provRowCss111) &&
+  /box-shadow:\s*0\s+6rpx\s+18rpx\s+rgba\(0,\s*0,\s*0,\s*0\.25\)/.test(provRowCss111));
+assert('1.1.1 省行：金色定位针 30rpx + #D9B36A',
+  /width:\s*30rpx/.test(provPinCss) && /height:\s*30rpx/.test(provPinCss) &&
+  /background:\s*#D9B36A/.test(provPinCss) && /left:\s*0/.test(provPinCss));
+assert('1.1.1 省行：计数与行尾箭头改亮白',
+  /color:\s*#FFFFFF/.test(provCountCss) && /font-weight:\s*500/.test(provCountCss) &&
+  /color:\s*#FFFFFF/.test(provArrowCss));
+assert('1.1.1 省行：进度条右端收在计数列左侧（36+150 = 36+40+110）',
+  /margin-right:\s*150rpx/.test(barCss111) && (36 + 150) === (36 + 40 + 110));
+assert('1.1.1 抽屉：顶部居中拖拽横条 64×8rpx 白色 25%',
+  /class="sheet-grab"/.test(mapSrc) && /width:\s*64rpx/.test(grabCss) && /height:\s*8rpx/.test(grabCss) &&
+  /rgba\(255,\s*255,\s*255,\s*0\.25\)/.test(grabCss) && /margin:\s*14rpx\s+auto\s+0/.test(grabCss));
+assert('1.1.1 抽屉：标题 30rpx 加粗', /font-size:\s*30rpx/.test(sheetTitleCss) && /font-weight:\s*700/.test(sheetTitleCss));
+assert('1.1.1 顶部：统计卡按胶囊实测 bottom + 16rpx 动态下移',
+  /getMenuButtonBoundingClientRect/.test(mapSrc) && /rect\.bottom/.test(mapSrc) &&
+  /bottomPx \+ 16 \* rpx2px/.test(mapSrc) && /paddingTop:\s*statsTop \+ 'rpx'/.test(mapSrc));
+assert('1.1.1 顶部：取不到胶囊时兜底「状态栏 + 96rpx」',
+  /statusBarHeight \|\| 20\) \+ 96/.test(mapSrc));
+assert('1.1.1 顶部：定位胶囊随统计卡同步下移',
+  /top:\s*\(statsTop \+ 162\) \+ 'rpx'/.test(mapSrc));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
