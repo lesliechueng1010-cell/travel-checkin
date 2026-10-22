@@ -15,7 +15,7 @@
  * 填写后需在微信开发者工具中开通云开发，并上传 cloudfunctions/ 下三个云函数。
  */
 export const CONFIG = JSON.parse(`{
-  "tmapKey": "",
+  "tmapKey": "GNZBZ-RX6YZ-BPRXM-7A42N-S5YRS-BIBVE",
   "cloudEnv": "",
   "tmapViaCloud": false
 }`);
