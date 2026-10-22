@@ -518,7 +518,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.3.1 / 131', manifestSrc.versionName === '1.3.1' && manifestSrc.versionCode === '131');
+assert('版本：1.3.2 / 132', manifestSrc.versionName === '1.3.2' && manifestSrc.versionCode === '132');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -690,5 +690,19 @@ assert('1.3.1 搜索框与过滤逻辑未动',
   /@input="onPickSearch"/.test(tripSrc) &&
   /const kw = \(this\.pickKw \|\| ''\)\.trim\(\)/.test(tripSrc) &&
   /CITIES\.filter\(c => c\.name\.includes\(kw\) \|\| c\.prov\.includes\(kw\)\)/.test(tripSrc));
+
+// 29. 1.3.2 行程页搜索框与城市行等高
+const sheetSearchCss132 = tripBlock('.sheet-search');
+const pickLineCss132 = tripBlock('.pick-line');
+assert('1.3.2 搜索框：height 88rpx + line-height 88rpx（占位文字不再被裁切）',
+  /height:\s*88rpx/.test(sheetSearchCss132) && /line-height:\s*88rpx/.test(sheetSearchCss132),
+  `sheet-search: ${JSON.stringify(sheetSearchCss132.trim())}`);
+assert('1.3.2 搜索框：border-radius 20rpx + padding 0 28rpx（与 .pick-line 同圆角同内边距）',
+  /border-radius:\s*20rpx/.test(sheetSearchCss132) && /padding:\s*0\s+28rpx/.test(sheetSearchCss132) &&
+  !/border-radius:\s*999rpx/.test(sheetSearchCss132) && !/padding:\s*18rpx/.test(sheetSearchCss132));
+assert('1.3.2 搜索框：外层观感与城市行一致（背景/描边/字号保留）',
+  /rgba\(245,\s*240,\s*230,\s*0\.06\)/.test(sheetSearchCss132) &&
+  /border-radius:\s*20rpx/.test(pickLineCss132) &&
+  /font-size:\s*27rpx/.test(sheetSearchCss132));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

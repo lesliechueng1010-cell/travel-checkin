@@ -304,7 +304,9 @@ export default {
 .sheet-search {
   background: rgba(245, 240, 230, 0.06);
   border: 1rpx solid rgba(245, 240, 230, 0.16);
-  border-radius: 999rpx; padding: 18rpx 28rpx;
+  /* 1.3.2：与城市行 .pick-line 同尺寸（88rpx 高），修掉真机搜索框偏矮、占位文字被裁切 */
+  height: 88rpx; line-height: 88rpx;
+  border-radius: 20rpx; padding: 0 28rpx;
   font-size: 27rpx; color: #F2EDE3;
 }
 /* 1.3.1：max-height 容器里 scroll-view 拿不到确定高度（真机滑不动），
