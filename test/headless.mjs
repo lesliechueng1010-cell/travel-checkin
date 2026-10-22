@@ -311,13 +311,46 @@ const block = sel => {
   const m = mapSrc.match(re);
   return m ? m[1] : '';
 };
+const provHeadCss = block('.prov-head');
+const provRowCss = block('.prov-row');
 const provCountCss = block('.prov-count');
 const provNameCss = block('.prov-name');
+const cityRowCss = block('.city-row');
 const cityNameCss = block('.city-name');
 const cityRightCss = block('.city-right');
-assert('抽屉：数字列固定宽度不参与压缩', /flex:\s*0\s+0\s+auto/.test(provCountCss) && /white-space:\s*nowrap/.test(provCountCss));
-assert('抽屉：省名占剩余宽度并可单行省略', /min-width:\s*0/.test(provNameCss) && /text-overflow:\s*ellipsis/.test(provNameCss) && /flex:\s*1\s+1\s+0%/.test(provNameCss));
-assert('抽屉：城市名同样单行省略、右侧徽标不压缩', /min-width:\s*0/.test(cityNameCss) && /text-overflow:\s*ellipsis/.test(cityNameCss) && /flex:\s*0\s+0\s+auto/.test(cityRightCss));
+// 1.0.4 起改用绝对定位钉右，不再依赖 flex 收缩（真机 flex 方案仍会被切）
+assert('抽屉：数字列绝对定位钉右、宽度固定、不换行',
+  /position:\s*absolute/.test(provCountCss) && /right:\s*0/.test(provCountCss) &&
+  /width:\s*110rpx/.test(provCountCss) && /white-space:\s*nowrap/.test(provCountCss) &&
+  /text-align:\s*right/.test(provCountCss) && /translateY\(-50%\)/.test(provCountCss));
+assert('抽屉：省名块级 + 右侧预留固定宽度并可单行省略',
+  /position:\s*relative/.test(provHeadCss) &&
+  /display:\s*block/.test(provNameCss) && /margin-right:\s*126rpx/.test(provNameCss) &&
+  /white-space:\s*nowrap/.test(provNameCss) && /text-overflow:\s*ellipsis/.test(provNameCss) &&
+  /overflow:\s*hidden/.test(provNameCss));
+assert('抽屉：城市行同样硬化（右列绝对定位 + 名称预留 90rpx）',
+  /position:\s*relative/.test(cityRowCss) && /overflow:\s*hidden/.test(cityRowCss) &&
+  /margin-right:\s*90rpx/.test(cityNameCss) && /text-overflow:\s*ellipsis/.test(cityNameCss) &&
+  /position:\s*absolute/.test(cityRightCss) && /right:\s*0/.test(cityRightCss));
+assert('抽屉：省行/城市行均加 overflow:hidden 兜底',
+  /overflow:\s*hidden/.test(provRowCss) && /overflow:\s*hidden/.test(cityRowCss));
+// 城市行右列预算：「想去」徽标 + 箭头必须收在 90rpx 预留区内，否则会压到城市名
+assert('抽屉：城市行徽标改用紧凑规格', /\.city-right\s+\.chip\s*\{[^}]*font-size:\s*20rpx/.test(mapSrc));
+const chipRpx = 2 * 0.55 * 20 + 20 + 6;   // 2 字 + 左右内边距 + 右外边距
+const arrowRpx = 0.6 * 22 + 8;            // 箭头 + 左外边距
+assert('抽屉：城市行右列（徽标+箭头）收在 90rpx 预留区内', chipRpx + arrowRpx <= 90,
+  `need=${(chipRpx + arrowRpx).toFixed(1)}rpx limit=90rpx`);
+
+// 21. 返回全国按钮收进抽屉标题栏；定位条改为整行
+assert('抽屉：顶部悬浮「返回全国」已移除', !/class="back-nation"/.test(mapSrc) && !/\.back-nation\s*\{/.test(mapSrc));
+assert('抽屉：标题栏内含「⬅ 返回全国」胶囊，仅省视图显示且不冒泡',
+  /class="back-pill"/.test(mapSrc) && /v-if="viewMode === 'province'"/.test(mapSrc) &&
+  /@tap\.stop="backNation"/.test(mapSrc));
+const locBannerCss = block('.loc-banner');
+assert('定位条：改为整行左右各 24rpx + 单行省略',
+  /left:\s*24rpx/.test(locBannerCss) && /right:\s*24rpx/.test(locBannerCss) &&
+  !/max-width/.test(locBannerCss) && /white-space:\s*nowrap/.test(locBannerCss) &&
+  /text-overflow:\s*ellipsis/.test(locBannerCss));
 // 预算：最宽数字 "100/100"（7 字符）在最窄剩余空间下仍完整可见
 const widestCount = 7 * 0.55 * 22;          // rpx，22rpx 字号按 0.55em/字符估
 const gapRpx = 16, nameMinRpx = 40, innerRpx = 750 - 56;
@@ -327,7 +360,7 @@ const gapRpx = 16, nameMinRpx = 40, innerRpx = 750 - 56;
   assert(`抽屉：${w}px 屏宽下数字完整可见`, need <= (innerRpx) * r, `need=${need.toFixed(1)}px avail=${(innerRpx * r).toFixed(1)}px`);
 });
 
-// 21. 我的页结构：各省进度整卡移除，新增最近足迹 / 成就徽章 / 导入入口
+// 22. 我的页结构：各省进度整卡移除，新增最近足迹 / 成就徽章 / 导入入口
 const mySrc = readFileSync(new URL('../src/pages/my/my.vue', import.meta.url), 'utf8');
 assert('我的页：已移除「各省进度」整卡', !mySrc.includes('各省进度'));
 assert('我的页：最近足迹 / 成就徽章 / 导入入口齐备',

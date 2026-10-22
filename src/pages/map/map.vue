@@ -35,9 +35,6 @@
       </view>
     </view>
 
-    <!-- 回到全国 -->
-    <view class="back-nation" v-if="viewMode === 'province'" @tap="backNation">⬅ 返回全国</view>
-
     <!-- 定位打卡提示 -->
     <view class="loc-banner" v-if="locCity && !visited[locCity.name]" @tap="goDetail(locCity.name)">
       📍 定位显示你在 <text class="brand-text">{{ locCity.name }}</text>（约 {{ locCity.dist }}km）· 去打卡 →
@@ -54,6 +51,8 @@
           <text class="sheet-summary">{{ sheetSummary }}</text>
         </view>
         <view class="handle-right">
+          <!-- 返回全国：收进标题栏，仅省视图显示（点按不触发抽屉展开/收起） -->
+          <view class="back-pill" v-if="viewMode === 'province'" @tap.stop="backNation">⬅ 返回全国</view>
           <text class="sheet-arrow" :class="{ rotate: sheetOpen }">▴</text>
         </view>
       </view>
@@ -303,20 +302,14 @@ export default {
   transition: width 0.4s ease;
 }
 
-.back-nation {
-  position: absolute; top: 230rpx; left: 24rpx; z-index: 5;
-  background: rgba(13,37,53,0.88);
-  border: 1rpx solid rgba(245,240,230,0.18);
-  color: #F5F0E6;
-  font-size: 24rpx; border-radius: 999rpx; padding: 12rpx 28rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.2);
-}
 .loc-banner {
-  position: absolute; top: 230rpx; right: 24rpx; z-index: 5; max-width: 58%;
+  position: absolute; top: 230rpx; left: 24rpx; right: 24rpx; z-index: 5;
+  display: block;
   background: rgba(232,168,56,0.16);
   border: 1rpx solid rgba(232,168,56,0.42);
   color: #F5F0E6;
   font-size: 22rpx; border-radius: 16rpx; padding: 14rpx 20rpx;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.18);
 }
 
@@ -334,12 +327,30 @@ export default {
   flex: 0 0 auto; max-height: 8vh; padding: 18rpx 28rpx;
   display: flex; justify-content: space-between; align-items: center;
 }
-.handle-left { display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
-.sheet-title-row { display: flex; align-items: center; gap: 10rpx; }
-.sheet-icon { font-size: 22rpx; color: #E8A838; }
-.sheet-title { font-size: 26rpx; color: #F5F0E6; font-weight: 600; }
-.sheet-summary { font-size: 20rpx; color: #8A9BA8; }
-.handle-right { flex: 0 0 auto; padding-left: 16rpx; }
+.handle-left { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
+.sheet-title-row { display: flex; align-items: center; gap: 10rpx; min-width: 0; }
+.sheet-icon { flex: 0 0 auto; font-size: 22rpx; color: #E8A838; }
+.sheet-title {
+  flex: 0 1 auto; min-width: 0;
+  font-size: 26rpx; color: #F5F0E6; font-weight: 600;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.sheet-summary {
+  font-size: 20rpx; color: #8A9BA8;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.handle-right {
+  flex: 0 0 auto; padding-left: 16rpx;
+  display: flex; flex-direction: row; align-items: center; gap: 14rpx;
+}
+/* 返回全国小胶囊（原顶部悬浮按钮收进标题栏） */
+.back-pill {
+  font-size: 20rpx; color: #F5F0E6; line-height: 1.4;
+  background: rgba(245,240,230,0.10);
+  border: 1rpx solid rgba(245,240,230,0.20);
+  border-radius: 999rpx; padding: 6rpx 16rpx;
+  white-space: nowrap;
+}
 .sheet-arrow {
   display: inline-block; font-size: 24rpx; color: #8A9BA8;
   transition: transform .28s ease, opacity .2s ease; opacity: .9;
@@ -353,15 +364,14 @@ export default {
 .sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 28rpx 30rpx; overflow-x: hidden; }
 
 /* 省份行 · 半透明胶囊感
-   布局硬化：省名占剩余宽度（可单行省略），数字列固定宽度不参与压缩，
-   保证 320 / 375 / 430 屏宽下右侧「已点亮/总数」都不会被挤出屏幕 */
-.prov-row { padding: 16rpx 0; }
-.prov-head {
-  display: flex; flex-direction: row; align-items: center;
-  width: 100%; min-width: 0;
-}
+   布局硬化（1.0.4 起改为绝对定位）：不再依赖 flex 收缩——
+   数字列 position:absolute 钉死在右端、脱离文档流，宽度 110rpx 固定，
+   任何屏宽下都不会被挤出屏幕；省名 margin-right:126rpx 给数字预留固定空间，
+   其余宽度用于自身，超出单行省略。 */
+.prov-row { padding: 16rpx 0; overflow: hidden; }
+.prov-head { position: relative; }
 .prov-name {
-  flex: 1 1 0%; min-width: 0; display: block;
+  display: block; margin-right: 126rpx;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-size: 26rpx; color: #F5F0E6;
   background: rgba(245, 240, 230, 0.08);
@@ -370,30 +380,33 @@ export default {
   padding: 6rpx 18rpx;
 }
 .prov-count {
-  flex: 0 0 auto; margin-left: 16rpx;
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 110rpx; text-align: right; white-space: nowrap;
   font-size: 22rpx; color: #8A9BA8;
-  white-space: nowrap; text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .prov-row .bar { margin-top: 12rpx; }
 
-/* 省视图城市行：同样的弹性硬化，城市名可省略，右侧徽标/箭头永不被挤掉 */
+/* 省视图城市行：同样绝对定位钉右，城市名预留 90rpx，右侧徽标/箭头永不被挤掉 */
 .city-row {
-  display: flex; flex-direction: row; align-items: center;
-  width: 100%; min-width: 0;
+  position: relative;
   padding: 22rpx 0;
+  overflow: hidden;
   border-bottom: 1rpx solid rgba(245, 240, 230, 0.08);
 }
 .city-name {
-  flex: 1 1 0%; min-width: 0; display: block;
+  display: block; margin-right: 90rpx;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-size: 28rpx; color: #8A9BA8;
 }
 .city-name.visited { color: #E8A838; font-weight: 500; }
 .city-right {
-  flex: 0 0 auto; margin-left: 16rpx;
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
   display: flex; flex-direction: row; align-items: center;
+  white-space: nowrap;
 }
+/* 右列整体收在 90rpx 预留区内：徽标在此处用紧凑规格，避免压到城市名 */
+.city-right .chip { font-size: 20rpx; padding: 2rpx 10rpx; margin-right: 6rpx; }
 .city-arrow {
   flex: 0 0 auto; font-size: 22rpx; color: #8A9BA8; margin-left: 8rpx;
 }
