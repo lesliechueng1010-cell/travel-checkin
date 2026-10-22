@@ -68,7 +68,11 @@
     <!-- 打卡记录 -->
     <view class="card">
       <text class="h3">最近打卡</text>
-      <view v-if="!recent.length" class="empty">还没有打卡记录，去地图点亮第一座城吧</view>
+      <view v-if="!recent.length" class="empty empty-block">
+        <view class="empty-ornament">◎</view>
+        <text class="empty-title">足迹还是一片空白</text>
+        <text class="empty-desc">去地图点亮第一座城，开启你的旅行手帐</text>
+      </view>
       <view class="visit-row" v-for="v in recent" :key="v.name">
         <image v-if="v.photo" :src="v.photo" class="visit-photo" mode="aspectFill" />
         <view style="flex:1">
@@ -252,24 +256,24 @@ export default {
 .avatar-btn::after { border: none; }
 .avatar {
   width: 120rpx; height: 120rpx; border-radius: 60rpx;
-  background: #1A2230; border: 1rpx solid #2C3948;
+  background: rgba(245,240,230,0.08); border: 1rpx solid rgba(245,240,230,0.18);
   display: flex; align-items: center; justify-content: center;
-  font-size: 44rpx; color: #5C6B7D;
+  font-size: 44rpx; color: #8A9BA8;
 }
-.avatar-empty { color: #5C6B7D; }
+.avatar-empty { color: #8A9BA8; }
 .profile-info { flex: 1; min-width: 0; }
-.nick-text { display: block; font-size: 32rpx; color: #E8EDF2; }
+.nick-text { display: block; font-size: 32rpx; color: #F5F0E6; }
 .nick-input {
-  background: #0E141D; border: 1rpx solid #2C3948; border-radius: 12rpx;
-  padding: 12rpx 18rpx; font-size: 30rpx; color: #E8EDF2; width: 100%;
+  background: rgba(10,31,44,0.45); border: 1rpx solid rgba(245,240,230,0.18); border-radius: 12rpx;
+  padding: 12rpx 18rpx; font-size: 30rpx; color: #F5F0E6; width: 100%;
 }
-.nick-tip { display: block; font-size: 20rpx; color: #7C8896; margin-top: 6rpx; line-height: 1.5; }
+.nick-tip { display: block; font-size: 20rpx; color: #8A9BA8; margin-top: 6rpx; line-height: 1.5; }
 .stats-hero { display: flex; gap: 20rpx; }
-.hero-item { flex: 1; background: #10161F; border-radius: 16rpx; padding: 22rpx; text-align: center; }
-.hero-num { display: block; font-size: 42rpx; font-weight: 800; color: #22C55E; margin-bottom: 8rpx; }
+.hero-item { flex: 1; background: rgba(13,37,53,0.9); border-radius: 16rpx; padding: 22rpx; text-align: center; }
+.hero-num { display: block; font-size: 42rpx; font-weight: 800; color: #E8A838; margin-bottom: 8rpx; }
 .prov-line { padding: 14rpx 0; }
-.prov-name2 { font-size: 25rpx; color: #E8EDF2; }
-.visit-row { display: flex; gap: 18rpx; align-items: center; padding: 16rpx 0; border-bottom: 1rpx solid #1B2432; }
+.prov-name2 { font-size: 25rpx; color: #F5F0E6; }
+.visit-row { display: flex; gap: 18rpx; align-items: center; padding: 16rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
 .visit-photo { width: 100rpx; height: 100rpx; border-radius: 12rpx; flex: 0 0 100rpx; }
-.visit-name { font-size: 28rpx; color: #E8EDF2; }
+.visit-name { font-size: 28rpx; color: #F5F0E6; }
 </style>

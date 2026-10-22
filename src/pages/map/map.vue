@@ -12,20 +12,26 @@
       @markertap="onMarkerTap"
     />
 
-    <!-- 顶部统计栏 -->
+    <!-- 顶部统计栏 · 毛玻璃悬浮卡 -->
     <view class="stats-bar">
       <view class="stats-inner">
         <view class="stat-main">
-          <text class="stat-num">{{ st.visitedCount }}</text>
-          <view>
-            <text class="stat-cap">已打卡城市 / {{ st.total }}</text>
-            <text class="stat-sub">点亮 {{ st.pct }}% · 点亮省份 {{ st.provDone }}/{{ st.provinces.length }}</text>
+          <view class="stat-num-wrap">
+            <text class="stat-num">{{ st.visitedCount }}</text>
+            <text class="stat-unit">城</text>
+          </view>
+          <view class="stat-meta">
+            <text class="stat-cap">已打卡 / {{ st.total }}</text>
+            <text class="stat-sub">点亮 {{ st.pct }}% · 省份 {{ st.provDone }}/{{ st.provinces.length }}</text>
           </view>
         </view>
         <view class="stat-actions">
           <view class="search-box" v-if="!showSearch" @tap="showSearch = true">🔍 搜城市</view>
           <input v-else class="search-input" v-model="kw" placeholder="输入城市名，如：喀什 / 大理" confirm-type="search" @confirm="doSearch" />
         </view>
+      </view>
+      <view class="progress-track">
+        <view class="progress-fill" :style="{ width: Math.min(100, st.pct) + '%' }"></view>
       </view>
     </view>
 
@@ -41,7 +47,10 @@
     <view class="bottom-sheet" :class="{ open: sheetOpen }">
       <view class="sheet-handle" @tap="toggleSheet">
         <view class="handle-left">
-          <text class="sheet-title">{{ sheetTitle }}</text>
+          <view class="sheet-title-row">
+            <text class="sheet-icon">▣</text>
+            <text class="sheet-title">{{ sheetTitle }}</text>
+          </view>
           <text class="sheet-summary">{{ sheetSummary }}</text>
         </view>
         <view class="handle-right">
@@ -157,7 +166,7 @@ export default {
             joinCluster: false,
             callout: {
               content: provAbbr(p) + ' ' + done + '/' + cities.length,
-              display: 'ALWAYS', fontSize: 9, borderRadius: 4, bgColor: '#10161F', color: '#E8EDF2', padding: 2
+              display: 'ALWAYS', fontSize: 9, borderRadius: 4, bgColor: 'rgba(10,31,44,0.88)', color: '#F5F0E6', padding: 3, borderWidth: 1, borderColor: 'rgba(232,168,56,0.35)'
             }
           };
         });
@@ -167,7 +176,7 @@ export default {
         const icon = this.visited[c.name] ? ICON.visited : (this.wish.includes(c.name) ? ICON.wish : ICON.none);
         return {
           id: 1000 + i, latitude: c.lat, longitude: c.lng, iconPath: icon, width: 22, height: 22,
-          callout: { content: c.name + (this.visited[c.name] ? ' ✓' : ''), display: 'BYCLICK', fontSize: 11, borderRadius: 6, bgColor: '#10161F', color: '#E8EDF2', padding: 5 }
+          callout: { content: c.name + (this.visited[c.name] ? ' ✓' : ''), display: 'BYCLICK', fontSize: 11, borderRadius: 6, bgColor: 'rgba(10,31,44,0.92)', color: '#F5F0E6', padding: 5, borderWidth: 1, borderColor: 'rgba(245,240,230,0.2)' }
         };
       });
     }
@@ -237,44 +246,104 @@ export default {
 <style scoped>
 .map-page { position: relative; height: 100vh; overflow: hidden; }
 .the-map { width: 100%; height: 100vh; }
+
+/* 顶部毛玻璃悬浮统计卡 */
 .stats-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 5;
-  padding: 70rpx 24rpx 16rpx;
-  background: linear-gradient(180deg, rgba(11,15,20,.96) 60%, rgba(11,15,20,0));
+  padding: 70rpx 24rpx 12rpx;
+  background: linear-gradient(180deg, rgba(10,31,44,.88) 50%, rgba(10,31,44,0));
 }
-.stats-inner { background: rgba(21,27,36,.92); border: 1rpx solid #232D3B; border-radius: 20rpx; padding: 20rpx 24rpx; display: flex; align-items: center; justify-content: space-between; }
-.stat-main { display: flex; align-items: center; gap: 16rpx; }
-.stat-num { font-size: 56rpx; font-weight: 800; color: #22C55E; }
-.stat-cap { display: block; font-size: 24rpx; color: #E8EDF2; }
-.stat-sub { display: block; font-size: 20rpx; color: #A8B3BF; }
+.stats-inner {
+  background: rgba(13, 37, 53, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1rpx solid rgba(245, 240, 230, 0.14);
+  border-radius: 20rpx;
+  padding: 22rpx 26rpx 18rpx;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 10rpx 32rpx rgba(0,0,0,0.28);
+}
+.stat-main { display: flex; align-items: center; gap: 18rpx; }
+.stat-num-wrap { display: flex; align-items: baseline; gap: 4rpx; }
+.stat-num {
+  font-size: 60rpx; font-weight: 800; line-height: 1;
+  color: #E8A838;
+  text-shadow: 0 2rpx 12rpx rgba(232,168,56,0.35);
+}
+.stat-unit { font-size: 22rpx; color: #C48A1A; font-weight: 600; }
+.stat-meta { display: flex; flex-direction: column; gap: 4rpx; }
+.stat-cap { display: block; font-size: 24rpx; color: #F5F0E6; font-weight: 500; }
+.stat-sub { display: block; font-size: 20rpx; color: #8A9BA8; }
 .stat-actions { text-align: right; }
-.search-box { font-size: 22rpx; color: #A8B3BF; background: #1A2230; border-radius: 12rpx; padding: 12rpx 20rpx; }
-.search-input { width: 260rpx; background: #0E141D; border: 1rpx solid #2C3948; border-radius: 12rpx; padding: 10rpx 16rpx; font-size: 22rpx; color: #E8EDF2; }
+.search-box {
+  font-size: 22rpx; color: #C8D0D8;
+  background: rgba(245,240,230,0.08);
+  border: 1rpx solid rgba(245,240,230,0.12);
+  border-radius: 14rpx; padding: 12rpx 20rpx;
+}
+.search-input {
+  width: 260rpx;
+  background: rgba(10,31,44,0.5);
+  border: 1rpx solid rgba(245,240,230,0.18);
+  border-radius: 14rpx; padding: 10rpx 16rpx;
+  font-size: 22rpx; color: #F5F0E6;
+}
+
+/* 渐变进度条 */
+.progress-track {
+  margin-top: 14rpx;
+  height: 10rpx;
+  border-radius: 999rpx;
+  background: rgba(245,240,230,0.1);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #C48A1A 0%, #E8A838 55%, #F0C060 100%);
+  box-shadow: 0 0 12rpx rgba(232,168,56,0.45);
+  transition: width 0.4s ease;
+}
+
 .back-nation {
-  position: absolute; top: 210rpx; left: 24rpx; z-index: 5;
-  background: rgba(21,27,36,.95); border: 1rpx solid #2C3948; color: #E8EDF2;
-  font-size: 24rpx; border-radius: 999rpx; padding: 10rpx 28rpx;
+  position: absolute; top: 230rpx; left: 24rpx; z-index: 5;
+  background: rgba(13,37,53,0.88);
+  border: 1rpx solid rgba(245,240,230,0.18);
+  color: #F5F0E6;
+  font-size: 24rpx; border-radius: 999rpx; padding: 12rpx 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.2);
 }
 .loc-banner {
-  position: absolute; top: 210rpx; right: 24rpx; z-index: 5; max-width: 60%;
-  background: rgba(34,197,94,.16); border: 1rpx solid rgba(34,197,94,.5); color: #E8EDF2;
+  position: absolute; top: 230rpx; right: 24rpx; z-index: 5; max-width: 58%;
+  background: rgba(232,168,56,0.16);
+  border: 1rpx solid rgba(232,168,56,0.42);
+  color: #F5F0E6;
   font-size: 22rpx; border-radius: 16rpx; padding: 14rpx 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.18);
 }
+
+/* 底部抽屉 */
 .bottom-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
-  background: #10161F; border-radius: 28rpx 28rpx 0 0; border-top: 1rpx solid #232D3B;
-  max-height: 40vh; display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(13, 37, 53, 0.96);
+  border-radius: 28rpx 28rpx 0 0;
+  border-top: 1rpx solid rgba(245,240,230,0.12);
+  max-height: 40vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 -8rpx 32rpx rgba(0,0,0,0.3);
 }
 .sheet-handle {
-  flex: 0 0 auto; max-height: 8vh; padding: 16rpx 28rpx;
+  flex: 0 0 auto; max-height: 8vh; padding: 18rpx 28rpx;
   display: flex; justify-content: space-between; align-items: center;
 }
-.handle-left { display: flex; flex-direction: column; gap: 2rpx; min-width: 0; }
-.sheet-title { font-size: 26rpx; color: #E8EDF2; font-weight: 600; }
-.sheet-summary { font-size: 20rpx; color: #A8B3BF; }
+.handle-left { display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
+.sheet-title-row { display: flex; align-items: center; gap: 10rpx; }
+.sheet-icon { font-size: 22rpx; color: #E8A838; }
+.sheet-title { font-size: 26rpx; color: #F5F0E6; font-weight: 600; }
+.sheet-summary { font-size: 20rpx; color: #8A9BA8; }
 .handle-right { flex: 0 0 auto; padding-left: 16rpx; }
 .sheet-arrow {
-  display: inline-block; font-size: 24rpx; color: #A8B3BF;
+  display: inline-block; font-size: 24rpx; color: #8A9BA8;
   transition: transform .28s ease, opacity .2s ease; opacity: .9;
 }
 .sheet-arrow.rotate { transform: rotate(180deg); }
@@ -283,9 +352,21 @@ export default {
   transition: max-height .28s ease, opacity .22s ease;
 }
 .sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 28rpx 30rpx; }
+
+/* 省份行 · 半透明胶囊感 */
 .prov-row { padding: 16rpx 0; }
-.prov-name { font-size: 26rpx; color: #E8EDF2; }
-.city-row { padding: 22rpx 0; border-bottom: 1rpx solid #1B2432; }
-.city-name { font-size: 28rpx; color: #A8B3BF; }
-.city-name.visited { color: #E8EDF2; }
+.prov-name {
+  font-size: 26rpx; color: #F5F0E6;
+  background: rgba(245,240,230,0.08);
+  border: 1rpx solid rgba(245,240,230,0.12);
+  border-radius: 999rpx;
+  padding: 6rpx 18rpx;
+}
+.prov-row .bar { margin-top: 12rpx; }
+.city-row {
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid rgba(245,240,230,0.08);
+}
+.city-name { font-size: 28rpx; color: #8A9BA8; }
+.city-name.visited { color: #E8A838; font-weight: 500; }
 </style>

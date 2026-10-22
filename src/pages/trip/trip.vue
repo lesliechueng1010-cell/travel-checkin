@@ -9,7 +9,11 @@
       <view class="city-line" v-if="cities.length">
         <text class="route-text">{{ cityNames }}</text>
       </view>
-      <view v-else class="empty">从想去清单加点城市，串成一条自驾环线</view>
+      <view v-else class="empty empty-block">
+        <view class="empty-ornament">— ◇ —</view>
+        <text class="empty-title">还没有行程</text>
+        <text class="empty-desc">从想去清单加几座城，串成一条自驾环线</text>
+      </view>
 
       <view class="trip-rows" v-if="cities.length">
         <view class="trip-row" v-for="(c, i) in cities" :key="c.name">
@@ -153,13 +157,13 @@ export default {
         markers: this.cities.map((c, i) => ({
           id: i, latitude: c.lat, longitude: c.lng, width: 20, height: 20,
           iconPath: i === 0 ? '/static/icons/dot_green.png' : '/static/icons/dot_orange.png',
-          callout: { content: (i + 1) + '. ' + c.name, display: 'ALWAYS', fontSize: 10, bgColor: '#10161F', color: '#E8EDF2', padding: 4, borderRadius: 6 }
+          callout: { content: (i + 1) + '. ' + c.name, display: 'ALWAYS', fontSize: 10, bgColor: 'rgba(13,37,53,0.9)', color: '#F5F0E6', padding: 4, borderRadius: 6 }
         })),
         polyline: [{
           points: this.cities.map(c => { return { latitude: c.lat, longitude: c.lng }; }).concat(
             m.mode !== 'driving' && this.cities.length > 2 ? [{ latitude: this.cities[0].lat, longitude: this.cities[0].lng }] : []
           ),
-          color: '#22C55E', width: 4, dottedLine: m.mode !== 'driving'
+          color: '#E8A838', width: 4, dottedLine: m.mode !== 'driving'
         }]
       };
       uni.hideLoading();
@@ -181,17 +185,17 @@ export default {
 </script>
 
 <style scoped>
-.trip-name { background: #0E141D; border: 1rpx solid #232D3B; border-radius: 12rpx; padding: 10rpx 18rpx; font-size: 24rpx; color: #E8EDF2; width: 300rpx; text-align: right; }
+.trip-name { background: rgba(10,31,44,0.45); border: 1rpx solid rgba(245,240,230,0.14); border-radius: 12rpx; padding: 10rpx 18rpx; font-size: 24rpx; color: #F5F0E6; width: 300rpx; text-align: right; }
 .city-line { margin-top: 16rpx; }
-.route-text { color: #22C55E; font-size: 26rpx; font-weight: 600; }
+.route-text { color: #E8A838; font-size: 26rpx; font-weight: 600; }
 .trip-rows { margin-top: 10rpx; }
-.trip-row { display: flex; align-items: center; gap: 18rpx; padding: 18rpx 0; border-bottom: 1rpx solid #1B2432; }
-.trip-row .ord { width: 44rpx; height: 44rpx; border-radius: 50%; background: #1A2230; color: #22C55E; display: flex; align-items: center; justify-content: center; font-size: 24rpx; flex: 0 0 44rpx; }
-.trip-row .name { flex: 1; font-size: 28rpx; color: #E8EDF2; }
+.trip-row { display: flex; align-items: center; gap: 18rpx; padding: 18rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
+.trip-row .ord { width: 44rpx; height: 44rpx; border-radius: 50%; background: rgba(245,240,230,0.08); color: #E8A838; display: flex; align-items: center; justify-content: center; font-size: 24rpx; flex: 0 0 44rpx; }
+.trip-row .name { flex: 1; font-size: 28rpx; color: #F5F0E6; }
 .ops { display: flex; gap: 10rpx; }
 .add-bar { margin-top: 20rpx; }
 .result-grid { display: flex; gap: 30rpx; margin-top: 16rpx; }
-.res { flex: 1; background: #10161F; border-radius: 16rpx; padding: 20rpx; }
-.res-num { display: block; font-size: 44rpx; font-weight: 800; color: #22C55E; margin-bottom: 6rpx; }
+.res { flex: 1; background: rgba(13,37,53,0.9); border-radius: 16rpx; padding: 20rpx; }
+.res-num { display: block; font-size: 44rpx; font-weight: 800; color: #E8A838; margin-bottom: 6rpx; }
 .trip-map { width: 100%; height: 440rpx; border-radius: 16rpx; margin-top: 20rpx; }
 </style>

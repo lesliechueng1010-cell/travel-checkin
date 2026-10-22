@@ -141,19 +141,19 @@ export default {
 
 <style scoped>
 .tabs { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 20rpx 0; }
-.tab { padding: 10rpx 26rpx; border-radius: 999rpx; background: #1A2230; color: #A8B3BF; font-size: 24rpx; }
-.tab.on { background: rgba(34,197,94,.18); color: #22C55E; font-weight: 700; }
-.safety-item { color: #A8B3BF; font-size: 26rpx; line-height: 1.9; padding: 6rpx 0; }
+.tab { padding: 10rpx 26rpx; border-radius: 999rpx; background: rgba(245,240,230,0.08); color: #8A9BA8; font-size: 24rpx; }
+.tab.on { background: rgba(232,168,56,0.2); color: #E8A838; font-weight: 700; }
+.safety-item { color: #8A9BA8; font-size: 26rpx; line-height: 1.9; padding: 6rpx 0; }
 .sos-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  background: #151B24; border-top: 2rpx solid #E54545;
+  background: rgba(13,37,53,0.95); border-top: 2rpx solid #C45648;
   display: flex; align-items: center; gap: 16rpx; padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
 }
 .sos-loc { flex: 1; min-width: 0; }
-.sos-cap { display: block; font-size: 20rpx; color: #6B7684; }
-.sos-city { display: block; font-size: 26rpx; color: #E8EDF2; margin-top: 4rpx; }
+.sos-cap { display: block; font-size: 20rpx; color: #8A9BA8; }
+.sos-city { display: block; font-size: 26rpx; color: #F5F0E6; margin-top: 4rpx; }
 .sos-btn { border-radius: 16rpx; color: #fff; font-size: 26rpx; font-weight: 700; height: 84rpx; line-height: 84rpx; padding: 0 34rpx; border: none; }
 .sos-btn::after { border: none; }
-.call-110 { background: #E54545; }
-.call-120 { background: #F59E0B; }
+.call-110 { background: #C45648; }
+.call-120 { background: #E8A838; }
 </style>

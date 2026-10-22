@@ -48,28 +48,29 @@ export default {
 
       // 背景
       const bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, '#0B0F14');
-      bg.addColorStop(1, '#10161F');
+      bg.addColorStop(0, '#0A1F2C');
+      bg.addColorStop(0.5, '#0D2535');
+      bg.addColorStop(1, '#122E3E');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
       // 装饰光晕
       const glow = ctx.createRadialGradient(W / 2, 300, 50, W / 2, 300, 420);
-      glow.addColorStop(0, 'rgba(34,197,94,.22)');
-      glow.addColorStop(1, 'rgba(34,197,94,0)');
+      glow.addColorStop(0, 'rgba(232,168,56,.28)');
+      glow.addColorStop(1, 'rgba(232,168,56,0)');
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, W, 700);
 
       // 标题
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#E8EDF2';
+      ctx.fillStyle = '#F5F0E6';
       ctx.font = 'bold 52px sans-serif';
       ctx.fillText(BRAND.name, W / 2, 130);
-      ctx.fillStyle = '#22C55E';
+      ctx.fillStyle = '#E8A838';
       ctx.font = '30px sans-serif';
       ctx.fillText(BRAND.slogan, W / 2, 185);
       const date = new Date();
-      ctx.fillStyle = '#6B7684';
+      ctx.fillStyle = '#8A9BA8';
       ctx.font = '22px sans-serif';
       ctx.fillText(date.getFullYear() + ' 年 ' + (date.getMonth() + 1) + ' 月 ' + date.getDate() + ' 日', W / 2, 228);
 
@@ -82,13 +83,17 @@ export default {
       ];
       cards.forEach((c, i) => {
         const x = 30 + i * ((W - 60) / 3) + (W - 60) / 6;
-        ctx.fillStyle = '#151B24';
+        ctx.fillStyle = 'rgba(245,240,230,0.1)';
         roundRect(ctx, 30 + i * ((W - 60) / 3), y0, (W - 60) / 3 - 16, 170, 20);
         ctx.fill();
-        ctx.fillStyle = '#22C55E';
+        ctx.strokeStyle = 'rgba(232,168,56,0.35)';
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, 30 + i * ((W - 60) / 3), y0, (W - 60) / 3 - 16, 170, 20);
+        ctx.stroke();
+        ctx.fillStyle = '#E8A838';
         ctx.font = 'bold 54px sans-serif';
         ctx.fillText(c[0], x - 8, y0 + 85);
-        ctx.fillStyle = '#A8B3BF';
+        ctx.fillStyle = '#8A9BA8';
         ctx.font = '22px sans-serif';
         ctx.fillText(c[1], x - 8, y0 + 130);
       });
@@ -96,30 +101,30 @@ export default {
       // 省份进度条（前 12 名）
       ctx.textAlign = 'left';
       let y = 520;
-      ctx.fillStyle = '#E8EDF2';
+      ctx.fillStyle = '#F5F0E6';
       ctx.font = 'bold 32px sans-serif';
       ctx.fillText('省份点亮进度', 40, y);
       y += 30;
       st.provinces.slice(0, 12).forEach((p) => {
         y += 46;
-        ctx.fillStyle = '#E8EDF2';
+        ctx.fillStyle = '#F5F0E6';
         ctx.font = '24px sans-serif';
         const pname = p.prov.length > 8 ? p.prov.slice(0, 8) : p.prov;
         ctx.fillText(pname, 40, y);
-        ctx.fillStyle = '#232D3B';
+        ctx.fillStyle = 'rgba(245,240,230,0.12)';
         roundRect(ctx, 260, y - 20, 380, 18, 9); ctx.fill();
         if (p.pct > 0) {
-          ctx.fillStyle = '#22C55E';
+          ctx.fillStyle = '#E8A838';
           roundRect(ctx, 260, y - 20, Math.max(18, 380 * p.pct / 100), 18, 9); ctx.fill();
         }
-        ctx.fillStyle = '#A8B3BF';
+        ctx.fillStyle = '#8A9BA8';
         ctx.font = '22px sans-serif';
         ctx.fillText(p.visited + '/' + p.total, 660, y);
       });
 
       // 城市墙
       y += 60;
-      ctx.fillStyle = '#E8EDF2';
+      ctx.fillStyle = '#F5F0E6';
       ctx.font = 'bold 32px sans-serif';
       ctx.fillText('我的足迹城市墙', 40, y);
       y += 44;
@@ -131,21 +136,21 @@ export default {
           const w2 = ctx.measureText(name).width + 28;
           if (x + w2 > W - 40) { x = 40; y += 52; }
           if (y > H - 120) return;
-          ctx.fillStyle = 'rgba(34,197,94,.15)';
+          ctx.fillStyle = 'rgba(232,168,56,.18)';
           roundRect(ctx, x, y - 24, w2, 40, 20); ctx.fill();
-          ctx.fillStyle = '#22C55E';
+          ctx.fillStyle = '#E8A838';
           ctx.fillText(name, x + 14, y + 4);
           x += w2 + 10;
         });
       } else {
-        ctx.fillStyle = '#6B7684';
+        ctx.fillStyle = '#8A9BA8';
         ctx.font = '24px sans-serif';
         ctx.fillText('还没有打卡城市，快去点亮第一座吧', 40, y);
       }
 
       // 底部
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#6B7684';
+      ctx.fillStyle = '#8A9BA8';
       ctx.font = '22px sans-serif';
       ctx.fillText('数据统计自「' + BRAND.name + '」小程序', W / 2, H - 50);
 
@@ -188,7 +193,12 @@ function roundRect(ctx, x, y, w, h, r) {
 
 <style scoped>
 .canvas-wrap { display: flex; justify-content: center; padding-top: 24rpx; }
-.poster-canvas { width: 700rpx; height: 1246rpx; border-radius: 20rpx; border: 1rpx solid #232D3B; }
+.poster-canvas {
+  width: 700rpx; height: 1246rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(232,168,56,0.25);
+  box-shadow: 0 12rpx 40rpx rgba(0,0,0,0.35);
+}
 .actions { display: flex; gap: 16rpx; margin: 28rpx 24rpx 0; }
 .actions .btn { flex: 1; }
 </style>

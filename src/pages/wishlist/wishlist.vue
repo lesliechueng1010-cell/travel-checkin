@@ -17,7 +17,11 @@
         <text class="h3">想去清单（{{ list.length }}）</text>
         <text class="tiny" v-if="hasLoc">按距离排序</text>
       </view>
-      <view v-if="!list.length" class="empty">还没有想去的城市<br />去地图点亮第一个目标吧</view>
+      <view v-if="!list.length" class="empty empty-block">
+        <view class="empty-ornament">☆ ○ ☆</view>
+        <text class="empty-title">想去清单还是空的</text>
+        <text class="empty-desc">去足迹地图挑一座心仪的城，点「想去」收藏</text>
+      </view>
       <view class="wish-row" v-for="c in list" :key="c.name">
         <view @tap="goDetail(c.name)">
           <text class="wish-name">{{ c.name }}</text>
@@ -83,7 +87,7 @@ export default {
 </script>
 
 <style scoped>
-.wish-row { display: flex; justify-content: space-between; align-items: center; padding: 22rpx 0; border-bottom: 1rpx solid #1B2432; }
-.wish-name { font-size: 30rpx; color: #E8EDF2; }
+.wish-row { display: flex; justify-content: space-between; align-items: center; padding: 22rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
+.wish-name { font-size: 30rpx; color: #F5F0E6; }
 .wish-actions { display: flex; gap: 12rpx; }
 </style>
