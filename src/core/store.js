@@ -8,7 +8,7 @@ const KEY = 'tf_data_v1';
 const SUB_KEY = 'tf_sub_v1';
 
 let state = {
-  visited: {},   // { 城市名: { date, note, photo, ts } }
+  visited: {},   // { 城市名: { date, note, photo, ts, source? } }  source='import' 表示历史足迹补录
   wishlist: [], // [城市名]
   trips: [],    // [{ id, name, cities: [城市名] }]
   openid: '',
@@ -42,6 +42,25 @@ function migrate() {
   }
   ['avatar', 'nickname'].forEach(k => { if (typeof state.profile[k] !== 'string') state.profile[k] = ''; });
   ['updatedAt', 'syncedAt'].forEach(k => { if (typeof state.profile[k] !== 'number') state.profile[k] = 0; });
+  migrateVisited();
+}
+
+/**
+ * 打卡记录向后兼容（1.0.3 起新增 source 字段）
+ * 老数据没有 source / date 为空字符串都能正常读，不丢档、不改写日期
+ */
+function migrateVisited() {
+  if (!state.visited || typeof state.visited !== 'object') state.visited = {};
+  Object.keys(state.visited).forEach(k => {
+    const v = state.visited[k];
+    if (!v || typeof v !== 'object') { delete state.visited[k]; return; }
+    if (typeof v.date !== 'string') v.date = '';
+    if (typeof v.note !== 'string') v.note = '';
+    if (typeof v.photo !== 'string') v.photo = '';
+    if (typeof v.ts !== 'number') v.ts = 0;
+    // 只有补录才带来源标记，老数据/手动打卡一律没有该字段
+    if (v.source !== 'import') delete v.source;
+  });
 }
 
 export function getProfile() {
@@ -68,6 +87,7 @@ export function setProfile(patch = {}) {
 
 export async function boot() {
   load();
+  migrate();   // 老版本数据先做一次向后兼容整形（不丢档）
   try { state.openid = await api.login(); } catch (e) {}
   try {
     const remote = await api.pull();
@@ -130,6 +150,48 @@ export function setLastLoc(loc) {
   persist();
 }
 
+/* ===== 历史足迹补录（1.0.3） ===== */
+
+export const IMPORT_NOTE = '补录 · 历史足迹导入';
+
+/**
+ * 批量导入历史足迹（照片识别 / 点选补录共用这一个动作）
+ * - 已点亮的城市自动跳过，不可重复导入
+ * - year 留空则不写日期（date = ''），绝不编造日期
+ * - 写入 source='import' 来源标记，每城自动生成一条补录游记
+ * @param {Array<{city?:string,name?:string,year?:string|number}>} list
+ * @returns {{imported:number, skipped:number, cities:string[]}}
+ */
+export function importFootprints(list = []) {
+  migrateVisited();
+  const now = Date.now();
+  const importedCities = [];
+  let skipped = 0;
+  (Array.isArray(list) ? list : []).forEach((item, i) => {
+    const name = typeof item === 'string' ? item : (item && (item.city || item.name)) || '';
+    if (!name) return;
+    if (state.visited[name]) { skipped++; return; }   // 已点亮 → 不重复
+    const raw = item && item.year !== undefined && item.year !== null ? String(item.year).trim() : '';
+    const year = /^\d{4}$/.test(raw) ? raw : '';
+    state.visited[name] = {
+      date: year ? year + '-01-01' : '',
+      note: IMPORT_NOTE,
+      photo: '',
+      ts: now + i,          // 同批次内保持稳定顺序
+      source: 'import'
+    };
+    state.wishlist = (state.wishlist || []).filter(n => n !== name);
+    importedCities.push(name);
+  });
+  if (importedCities.length) {
+    state.updatedAt = now;
+    persist();
+    emit();
+    api.push(state).catch(() => {});
+  }
+  return { imported: importedCities.length, skipped, cities: importedCities };
+}
+
 export function getStats() { return stats(state.visited); }
 
-export default { get, boot, checkin, uncheckin, toggleWish, saveTrip, removeTrip, setLastLoc, getStats, subscribe, getProfile, setProfile };
+export default { get, boot, checkin, uncheckin, toggleWish, saveTrip, removeTrip, setLastLoc, getStats, subscribe, getProfile, setProfile, importFootprints, IMPORT_NOTE };

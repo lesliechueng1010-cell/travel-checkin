@@ -31,6 +31,45 @@ export function stats(visitedMap) {
   };
 }
 
+/**
+ * 照片 GPS 就近匹配城市的阈值（直线 km）
+ * 宁缺毋滥：超出阈值一律不猜，交给用户手动补录。
+ */
+export const GPS_MATCH_KM = 80;
+
+/** 最近足迹：按打卡日期倒序（同日期按写入时间倒序），日期为空视为最旧 */
+export function recentFootprints(visitedMap = {}, n = 5) {
+  return Object.keys(visitedMap)
+    .map(name => {
+      const v = visitedMap[name] || {};
+      return {
+        name,
+        date: typeof v.date === 'string' ? v.date : '',
+        note: typeof v.note === 'string' ? v.note : '',
+        photo: v.photo || '',
+        source: v.source === 'import' ? 'import' : '',
+        ts: typeof v.ts === 'number' ? v.ts : 0
+      };
+    })
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;   // 空字符串排最后
+      return b.ts - a.ts;
+    })
+    .slice(0, n);
+}
+
+/**
+ * 用照片坐标匹配城市：仅在 maxKm 内命中才返回，否则 null
+ * @returns {{city: object, dist: number}|null}
+ */
+export function matchCityWithin(loc, maxKm = GPS_MATCH_KM) {
+  if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return null;
+  if (!isFinite(loc.lat) || !isFinite(loc.lng)) return null;
+  const near = nearestCities(loc, 1, false)[0];
+  if (!near) return null;
+  return near.dist <= maxKm ? { city: near, dist: near.dist } : null;
+}
+
 /** 距 loc 最近的 n 个城市（可过滤未打卡） */
 export function nearestCities(loc, n = 5, onlyUnvisited = false, visitedMap = {}) {
   const list = CITIES

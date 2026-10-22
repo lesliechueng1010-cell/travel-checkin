@@ -53,32 +53,66 @@
       <button class="btn primary" style="margin-top:20rpx" @tap="goPoster">🎨 生成足迹海报</button>
     </view>
 
-    <!-- 各省进度 -->
-    <view class="card">
-      <text class="h3">各省进度</text>
-      <view class="prov-line" v-for="p in st.provinces" :key="p.prov">
-        <view class="row">
-          <text class="prov-name2">{{ p.prov }}</text>
-          <text class="tiny">{{ p.visited }}/{{ p.total}} · {{ p.pct }}%</text>
-        </view>
-        <view class="bar"><view :style="{ width: p.pct + '%' }"></view></view>
+    <!-- 导入历史足迹入口（统计卡下方） -->
+    <view class="card import-card" @tap="goImport">
+      <view class="import-main">
+        <text class="import-title">📥 导入历史足迹</text>
+        <text class="import-desc">照片识别拍摄地点与年份，或按省→市点选补录；已点亮的城市自动跳过</text>
       </view>
+      <text class="import-arrow">›</text>
     </view>
 
-    <!-- 打卡记录 -->
+    <!-- 成就徽章 -->
     <view class="card">
-      <text class="h3">最近打卡</text>
+      <view class="row">
+        <text class="h3">成就徽章</text>
+        <text class="tiny">已解锁 {{ badgeUnlocked }}/{{ badges.length }}</text>
+      </view>
+      <scroll-view scroll-x class="badge-scroll" :show-scrollbar="false">
+        <view class="badge-row">
+          <view
+            class="badge"
+            :class="{ locked: !b.unlocked }"
+            v-for="b in badges"
+            :key="b.id"
+            @tap="tapBadge(b)"
+          >
+            <view class="badge-icon"><text class="badge-emoji">{{ b.unlocked ? b.icon : '🔒' }}</text></view>
+            <text class="badge-title">{{ b.title }}</text>
+            <text class="badge-sub" v-if="b.unlocked">{{ b.date || '已解锁' }}</text>
+            <text class="badge-sub" v-else>{{ b.cond }}</text>
+          </view>
+        </view>
+      </scroll-view>
+      <text class="tiny badge-tip">未解锁徽章已按条件灰显 · 点徽章看规则与进度</text>
+    </view>
+
+    <!-- 最近足迹 -->
+    <view class="card">
+      <view class="row">
+        <text class="h3">最近足迹</text>
+        <text class="tiny" v-if="recent.length">按打卡时间倒序</text>
+      </view>
+
       <view v-if="!recent.length" class="empty empty-block">
         <view class="empty-ornament">◎</view>
-        <text class="empty-title">足迹还是一片空白</text>
-        <text class="empty-desc">去地图点亮第一座城，开启你的旅行手帐</text>
-      </view>
-      <view class="visit-row" v-for="v in recent" :key="v.name">
-        <image v-if="v.photo" :src="v.photo" class="visit-photo" mode="aspectFill" />
-        <view style="flex:1">
-          <text class="visit-name" @tap="goDetail(v.name)">{{ v.name }}</text>
-          <text class="tiny" style="display:block">{{ v.date }}<text v-if="v.note"> · {{ v.note }}</text></text>
+        <text class="empty-title">还没有点亮的城市</text>
+        <text class="empty-desc">去足迹地图点亮第一座城，或把以前的旅程批量补录进来</text>
+        <view class="empty-actions">
+          <button class="btn primary sm" @tap="goMap">去地图点亮</button>
+          <button class="btn ghost sm" @tap="goImport">导入历史足迹</button>
         </view>
+      </view>
+
+      <view class="foot-row" v-for="v in recent" :key="v.name" @tap="goDetail(v.name)">
+        <view class="foot-main">
+          <view class="foot-line">
+            <text class="foot-name">{{ v.name }}</text>
+            <text class="chip orange" v-if="v.source === 'import'">补录</text>
+          </view>
+          <text class="foot-sub">{{ v.date || '日期未填' }}<text v-if="v.note"> · {{ v.note }}</text></text>
+        </view>
+        <text class="foot-arrow">›</text>
       </view>
     </view>
 
@@ -99,6 +133,8 @@ import cache from '../../utils/cache.js';
 import api from '../../api/index.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
 import { GUIDES } from '../../data/guides.js';
+import { evaluate } from '../../core/achievements.js';
+import { recentFootprints } from '../../core/logic.js';
 
 export default {
   data() {
@@ -107,6 +143,8 @@ export default {
       idText: '登录采用微信授权，无需注册账号密码',
       st: { visitedCount: 0, total: 0, pct: 0, provDone: 0, provinces: [] },
       recent: [],
+      badges: [],
+      badgeUnlocked: 0,
       cached: 0,
       cloudOn: false,
       profile: { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 },
@@ -177,13 +215,25 @@ export default {
       }
     },
     refresh() {
-      this.st = store.getStats();
       const s = store.get();
-      this.recent = Object.keys(s.visited)
-        .map(n => ({ name: n, ...s.visited[n] }))
-        .sort((a, b) => b.ts - a.ts)
-        .slice(0, 8);
+      this.st = store.getStats();
+      this.recent = recentFootprints(s.visited, 5);
+      const ach = evaluate(s.visited);
+      this.badges = ach.badges;
+      this.badgeUnlocked = ach.unlocked;
       this.cached = cache.cacheCount();
+    },
+    /* 徽章详情：解锁条件 + 当前进度，未解锁也能看到差多少 */
+    tapBadge(b) {
+      const p = b.progress || { cur: 0, total: 0 };
+      const lines = ['条件：' + b.cond];
+      if (b.unlocked) {
+        lines.push('状态：已解锁' + (b.date ? ' · ' + b.date : ''));
+        if (b.detail) lines.push(b.detail);
+      } else {
+        lines.push('状态：未解锁 · 当前 ' + p.cur + '/' + p.total);
+      }
+      uni.showModal({ title: b.title, content: lines.join('\n'), showCancel: false, confirmText: '知道了' });
     },
     async doLogin() {
       try {
@@ -205,6 +255,8 @@ export default {
     goDetail(name) { uni.navigateTo({ url: '/pages/city/detail?name=' + encodeURIComponent(name) }); },
     goPoster() { uni.navigateTo({ url: '/pages/poster/poster' }); },
     goSafety() { uni.navigateTo({ url: '/pages/safety/safety' }); },
+    goImport() { uni.navigateTo({ url: '/pages/import/import' }); },
+    goMap() { uni.switchTab({ url: '/pages/map/map' }); },
     clearCache() {
       uni.showModal({
         title: '清理离线缓存',
@@ -271,9 +323,76 @@ export default {
 .stats-hero { display: flex; gap: 20rpx; }
 .hero-item { flex: 1; background: rgba(13,37,53,0.9); border-radius: 16rpx; padding: 22rpx; text-align: center; }
 .hero-num { display: block; font-size: 42rpx; font-weight: 800; color: #E8A838; margin-bottom: 8rpx; }
-.prov-line { padding: 14rpx 0; }
-.prov-name2 { font-size: 25rpx; color: #F5F0E6; }
-.visit-row { display: flex; gap: 18rpx; align-items: center; padding: 16rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
-.visit-photo { width: 100rpx; height: 100rpx; border-radius: 12rpx; flex: 0 0 100rpx; }
-.visit-name { font-size: 28rpx; color: #F5F0E6; }
+.hero-item .tiny { color: #C8D0D8; }
+
+/* 导入历史足迹入口卡 */
+.import-card { display: flex; flex-direction: row; align-items: center; gap: 18rpx; }
+.import-main { flex: 1 1 0%; min-width: 0; }
+.import-title { display: block; font-size: 30rpx; font-weight: 600; color: #1A2A32; }
+.import-desc {
+  display: block; margin-top: 6rpx; font-size: 22rpx; color: #7A8B98; line-height: 1.5;
+  overflow: hidden;
+}
+.import-arrow { flex: 0 0 auto; font-size: 32rpx; color: #C48A1A; }
+
+/* 成就徽章：一排横向滚动，未解锁灰显 */
+.badge-scroll { width: 100%; margin-top: 18rpx; white-space: nowrap; }
+.badge-row { display: inline-flex; flex-direction: row; align-items: stretch; }
+.badge {
+  width: 200rpx; flex: 0 0 200rpx; margin-right: 16rpx;
+  padding: 20rpx 12rpx 18rpx;
+  border-radius: 16rpx;
+  background: rgba(232,168,56,0.10);
+  border: 1rpx solid rgba(196,138,26,0.22);
+  text-align: center; white-space: normal;
+}
+.badge:last-child { margin-right: 0; }
+.badge.locked {
+  background: rgba(26,42,50,0.05);
+  border-color: rgba(26,42,50,0.10);
+  opacity: .62;
+}
+.badge-icon {
+  width: 76rpx; height: 76rpx; border-radius: 50%; margin: 0 auto 12rpx;
+  background: linear-gradient(135deg, #E8A838 0%, #D4922A 100%);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4rpx 14rpx rgba(232,168,56,0.35);
+}
+.badge.locked .badge-icon {
+  background: rgba(26,42,50,0.10);
+  box-shadow: none;
+}
+.badge-emoji { font-size: 34rpx; line-height: 1; }
+.badge-title { display: block; font-size: 24rpx; font-weight: 600; color: #1A2A32; }
+.badge.locked .badge-title { color: #6B7C8A; }
+.badge-sub {
+  display: block; margin-top: 6rpx; font-size: 18rpx;
+  color: #C48A1A; line-height: 1.45;
+}
+.badge.locked .badge-sub { color: #8A9BA8; }
+.badge-tip { display: block; margin-top: 14rpx; }
+
+/* 最近足迹 */
+.foot-row {
+  display: flex; flex-direction: row; align-items: center;
+  padding: 18rpx 0; border-bottom: 1rpx solid rgba(26,42,50,0.08);
+}
+.foot-row:last-child { border-bottom: none; padding-bottom: 0; }
+.foot-main { flex: 1 1 0%; min-width: 0; }
+.foot-line { display: flex; flex-direction: row; align-items: center; }
+.foot-name { font-size: 30rpx; color: #1A2A32; font-weight: 500; }
+.foot-line .chip { margin-left: 12rpx; margin-right: 0; }
+.foot-sub {
+  display: block; margin-top: 6rpx; font-size: 22rpx; color: #7A8B98;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.foot-arrow { flex: 0 0 auto; margin-left: 12rpx; font-size: 26rpx; color: #8A9BA8; }
+
+/* 空态 */
+.empty-ornament { font-size: 40rpx; color: rgba(196,138,26,0.55); margin-bottom: 12rpx; }
+.empty-title { display: block; font-size: 28rpx; color: #3A4A55; font-weight: 600; }
+.empty-desc { display: block; margin-top: 8rpx; font-size: 22rpx; color: #7A8B98; line-height: 1.5; }
+.empty-actions { display: flex; flex-direction: row; justify-content: center; gap: 16rpx; margin-top: 22rpx; }
+.empty-actions .btn { flex: 0 0 auto; width: 250rpx; padding: 0; }
+.empty-actions .btn.ghost { color: #3A4A55; border-color: rgba(26,42,50,0.22); }
 </style>

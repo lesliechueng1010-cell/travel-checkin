@@ -60,21 +60,19 @@
       <scroll-view scroll-y class="sheet-body" :class="{ show: sheetOpen }">
         <view v-if="viewMode === 'nation'">
           <view class="prov-row" v-for="p in st.provinces" :key="p.prov" @tap="drill(p.prov)">
-            <view class="row">
+            <view class="prov-head">
               <text class="prov-name">{{ p.prov }}</text>
-              <text class="tiny">{{ p.visited }}/{{ p.total }}</text>
+              <text class="prov-count">{{ p.visited }}/{{ p.total }}</text>
             </view>
             <view class="bar"><view :style="{ width: p.pct + '%' }"></view></view>
           </view>
         </view>
         <view v-else>
-          <view class="city-row row" v-for="c in provCities" :key="c.name" @tap="goDetail(c.name)">
-            <text class="city-name" :class="{ visited: !!visited[c.name] }">
-              {{ visited[c.name] ? '✅ ' : '⬜ ' }}{{ c.name }}
-            </text>
-            <view>
+          <view class="city-row" v-for="c in provCities" :key="c.name" @tap="goDetail(c.name)">
+            <text class="city-name" :class="{ visited: !!visited[c.name] }">{{ visited[c.name] ? '✅ ' : '⬜ ' }}{{ c.name }}</text>
+            <view class="city-right">
               <text v-if="wished(c.name)" class="chip orange">想去</text>
-              <text class="tiny"> ›</text>
+              <text class="city-arrow">›</text>
             </view>
           </view>
         </view>
@@ -348,25 +346,55 @@ export default {
 }
 .sheet-arrow.rotate { transform: rotate(180deg); }
 .sheet-body {
-  flex: 1 1 auto; max-height: 0; opacity: 0; overflow: hidden;
+  flex: 1 1 auto; max-height: 0; opacity: 0;
+  overflow: hidden; overflow-x: hidden;
   transition: max-height .28s ease, opacity .22s ease;
 }
-.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 28rpx 30rpx; }
+.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 28rpx 30rpx; overflow-x: hidden; }
 
-/* 省份行 · 半透明胶囊感 */
+/* 省份行 · 半透明胶囊感
+   布局硬化：省名占剩余宽度（可单行省略），数字列固定宽度不参与压缩，
+   保证 320 / 375 / 430 屏宽下右侧「已点亮/总数」都不会被挤出屏幕 */
 .prov-row { padding: 16rpx 0; }
+.prov-head {
+  display: flex; flex-direction: row; align-items: center;
+  width: 100%; min-width: 0;
+}
 .prov-name {
+  flex: 1 1 0%; min-width: 0; display: block;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-size: 26rpx; color: #F5F0E6;
-  background: rgba(245,240,230,0.08);
-  border: 1rpx solid rgba(245,240,230,0.12);
+  background: rgba(245, 240, 230, 0.08);
+  border: 1rpx solid rgba(245, 240, 230, 0.12);
   border-radius: 999rpx;
   padding: 6rpx 18rpx;
 }
-.prov-row .bar { margin-top: 12rpx; }
-.city-row {
-  padding: 22rpx 0;
-  border-bottom: 1rpx solid rgba(245,240,230,0.08);
+.prov-count {
+  flex: 0 0 auto; margin-left: 16rpx;
+  font-size: 22rpx; color: #8A9BA8;
+  white-space: nowrap; text-align: right;
+  font-variant-numeric: tabular-nums;
 }
-.city-name { font-size: 28rpx; color: #8A9BA8; }
+.prov-row .bar { margin-top: 12rpx; }
+
+/* 省视图城市行：同样的弹性硬化，城市名可省略，右侧徽标/箭头永不被挤掉 */
+.city-row {
+  display: flex; flex-direction: row; align-items: center;
+  width: 100%; min-width: 0;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid rgba(245, 240, 230, 0.08);
+}
+.city-name {
+  flex: 1 1 0%; min-width: 0; display: block;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 28rpx; color: #8A9BA8;
+}
 .city-name.visited { color: #E8A838; font-weight: 500; }
+.city-right {
+  flex: 0 0 auto; margin-left: 16rpx;
+  display: flex; flex-direction: row; align-items: center;
+}
+.city-arrow {
+  flex: 0 0 auto; font-size: 22rpx; color: #8A9BA8; margin-left: 8rpx;
+}
 </style>

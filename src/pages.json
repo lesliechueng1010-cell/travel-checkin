@@ -5,6 +5,7 @@
     { "path": "pages/trip/trip", "style": { "navigationBarTitleText": "串线行程", "backgroundColor": "#0A1F2C" } },
     { "path": "pages/my/my", "style": { "navigationBarTitleText": "我的足迹", "backgroundColor": "#0A1F2C" } },
     { "path": "pages/city/detail", "style": { "navigationBarTitleText": "城市详情", "backgroundColor": "#0A1F2C" } },
+    { "path": "pages/import/import", "style": { "navigationBarTitleText": "导入历史足迹", "backgroundColor": "#0A1F2C" } },
     { "path": "pages/poster/poster", "style": { "navigationBarTitleText": "足迹海报", "backgroundColor": "#0A1F2C" } },
     { "path": "pages/safety/safety", "style": { "navigationBarTitleText": "安全角", "backgroundColor": "#0A1F2C" } }
   ],

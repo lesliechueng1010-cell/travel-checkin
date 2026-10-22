@@ -15,7 +15,10 @@
           </button>
           <button class="btn sm ghost" @tap="openNav">🧭 导航</button>
         </view>
-        <view class="cover-visited" v-if="visitedInfo">打卡于 {{ visitedInfo.date }}<text v-if="visitedInfo.note"> · {{ visitedInfo.note }}</text></view>
+        <view class="cover-visited" v-if="visitedInfo">
+          <text v-if="visitedInfo.source === 'import'" class="chip orange">补录</text>
+          打卡于 {{ visitedInfo.date || '日期未填' }}<text v-if="visitedInfo.note"> · {{ visitedInfo.note }}</text>
+        </view>
       </view>
     </view>
 
@@ -233,7 +236,7 @@ export default {
     pointNames(r) { return (r.points || []).map(p => p.n).join(' → '); },
     openCheckin() {
       this.form = {
-        date: this.visitedInfo ? this.visitedInfo.date : new Date().toISOString().slice(0, 10),
+        date: (this.visitedInfo && this.visitedInfo.date) || new Date().toISOString().slice(0, 10),
         note: this.visitedInfo ? this.visitedInfo.note : '',
         photo: this.visitedInfo ? this.visitedInfo.photo : ''
       };
@@ -372,6 +375,12 @@ export default {
   font-size: 22rpx;
   color: rgba(245,240,230,0.65);
   margin-top: 6rpx;
+}
+/* 封面在深色底上，补录标记改用暖金亮色保证可读 */
+.cover-visited .chip {
+  background: rgba(232,168,56,0.22);
+  color: #F0C060;
+  margin-right: 8rpx;
 }
 
 /* 分区卡片内微调 */
