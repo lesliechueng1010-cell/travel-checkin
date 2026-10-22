@@ -179,8 +179,9 @@ assert('补录：已点亮城市不重复导入', imp2.imported === 0 && imp2.sk
 assert('补录：统计立即刷新', store.getStats().visitedCount === beforeCount + 2);
 assert('补录：成就立即刷新（含补录城市）', ach.evaluate(store.get().visited).badges.find(b => b.id === 'city_1').unlocked === true);
 
-// 17. EXIF 解析（本地构造最小 JPEG 样例，不依赖真实照片）
-function buildExifJpeg(opt = {}) {
+// 17. EXIF 解析（本地构造最小 JPEG / HEIC 样例，不依赖真实照片）
+/** 只造 TIFF 结构（EXIF 的核心），JPEG 与 HEIC 都复用它 */
+function buildTiff(opt = {}) {
   const little = opt.little !== false;
   const latRef = opt.latRef || 'N';
   const lngRef = opt.lngRef || 'E';
@@ -251,6 +252,12 @@ function buildExifJpeg(opt = {}) {
     });
   };
   if (withGps) { writeDms(latOff, dms); writeDms(lngOff, lngDms); }
+  return u8;
+}
+
+function buildExifJpeg(opt = {}) {
+  const tiff = buildTiff(opt);
+  const total = tiff.length;
 
   // 包一层 JPEG：SOI + APP1(Exif) + EOI
   const app1Len = 2 + 6 + total;
@@ -260,9 +267,101 @@ function buildExifJpeg(opt = {}) {
   jpeg[2] = 0xFF; jpeg[3] = 0xE1;
   jv.setUint16(4, app1Len, false);
   'Exif\u0000\u0000'.split('').forEach((ch, i) => { jpeg[6 + i] = ch.charCodeAt(0); });
-  jpeg.set(new Uint8Array(buf), 12);
+  jpeg.set(tiff, 12);
   jpeg[jpeg.length - 2] = 0xFF; jpeg[jpeg.length - 1] = 0xD9;
   return jpeg.buffer;
+}
+
+const asciiBytes = (s, n) => {
+  const a = new Uint8Array(n);
+  for (let i = 0; i < n; i++) a[i] = i < s.length ? s.charCodeAt(i) : 0;
+  return a;
+};
+
+/**
+ * 造最小 HEIC（ISO-BMFF）：ftyp + meta{ iinf(infe 里 item_type='Exif'), iloc, [idat] }
+ * opt.prefix  Exif 数据块里 TIFF 前是否带 "Exif\0\0"
+ * opt.idat    用 iloc v1 + construction_method=1（数据放 idat 盒内）而不是文件偏移
+ */
+function buildHeic(opt = {}) {
+  const prefix = opt.prefix !== false;
+  const declared = opt.declared === undefined ? (prefix ? 6 : 0) : opt.declared;
+  const withIinf = opt.withIinf !== false;
+  const useIdat = opt.idat === true;
+  const tiff = buildTiff(opt);
+
+  const payloadLen = 4 + (prefix ? 6 : 0) + tiff.length;
+  const payload = new Uint8Array(payloadLen);
+  new DataView(payload.buffer).setUint32(0, declared, false);
+  if (prefix) payload.set(asciiBytes('Exif\u0000\u0000', 6), 4);
+  payload.set(tiff, 4 + (prefix ? 6 : 0));
+
+  const infeLen = 8 + 4 + 2 + 2 + 4 + 4;                  // v2：item_ID + protection + item_type + name
+  const iinfLen = 8 + 4 + 2 + infeLen;
+  const idatLen = 8 + payloadLen;
+  const ilocLen = useIdat
+    ? 8 + 4 + 2 + 2 + (2 + 2 + 2 + 2 + 4 + 4)             // v1 多一个 construction_method
+    : 8 + 4 + 2 + 2 + (2 + 2 + 2 + 4 + 4);
+  const ftypLen = 24;
+  const metaLen = 8 + 4 + (withIinf ? iinfLen : 0) + ilocLen + (useIdat ? idatLen : 0);
+  const dataStart = ftypLen + metaLen;
+
+  const out = new Uint8Array(dataStart + (useIdat ? 0 : payloadLen));
+  const dv = new DataView(out.buffer);
+  const box = (at, size, type) => {
+    dv.setUint32(at, size, false);
+    out.set(asciiBytes(type, 4), at + 4);
+  };
+
+  // ftyp
+  box(0, ftypLen, 'ftyp');
+  out.set(asciiBytes('heic', 4), 8);
+  dv.setUint32(12, 0, false);
+  out.set(asciiBytes('mif1', 4), 16);
+  out.set(asciiBytes('heic', 4), 20);
+
+  // meta（FullBox）
+  const metaAt = ftypLen;
+  box(metaAt, metaLen, 'meta');
+  dv.setUint32(metaAt + 8, 0, false);
+  let cur = metaAt + 12;
+
+  if (withIinf) {
+    box(cur, iinfLen, 'iinf');
+    dv.setUint32(cur + 8, 0, false);          // version 0
+    dv.setUint16(cur + 12, 1, false);         // entry_count
+    const infeAt = cur + 14;
+    box(infeAt, infeLen, 'infe');
+    out[infeAt + 8] = 2;                      // version 2
+    dv.setUint16(infeAt + 12, 1, false);      // item_ID
+    dv.setUint16(infeAt + 14, 0, false);      // protection_index
+    out.set(asciiBytes('Exif', 4), infeAt + 16);
+    out[infeAt + 20] = 0;                     // item_name
+    cur += iinfLen;
+  }
+
+  box(cur, ilocLen, 'iloc');
+  out[cur + 8] = useIdat ? 1 : 0;             // version
+  out[cur + 12] = 0x44;                       // offset_size=4, length_size=4
+  out[cur + 13] = 0x00;                       // base_offset_size=0 (+ index_size=0)
+  dv.setUint16(cur + 14, 1, false);           // item_count
+  dv.setUint16(cur + 16, 1, false);           // item_ID
+  if (useIdat) dv.setUint16(cur + 18, 1, false);   // construction_method=1 → idat 内
+  // data_reference_index / extent_count 位置随 version 不同，统一按偏移写
+  const p = useIdat ? 20 : 18;
+  dv.setUint16(cur + p, 0, false);            // data_reference_index
+  dv.setUint16(cur + p + 2, 1, false);        // extent_count
+  dv.setUint32(cur + p + 4, useIdat ? 0 : dataStart, false);   // extent_offset
+  dv.setUint32(cur + p + 8, payloadLen, false);                // extent_length
+  cur += ilocLen;
+
+  if (useIdat) {
+    box(cur, idatLen, 'idat');
+    out.set(payload, cur + 8);
+  } else {
+    out.set(payload, dataStart);
+  }
+  return out.buffer;
 }
 
 const jpg = buildExifJpeg();
@@ -280,8 +379,29 @@ const noGps = exifMod.parseExif(buildExifJpeg({ withGps: false }));
 assert('EXIF：无位置信息 → 标记跳过而不是猜', noGps.ok === false && noGps.reason === 'no-gps');
 const pngBuf = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0]).buffer;
 assert('EXIF：PNG 明确标记不支持', exifMod.parseExif(pngBuf).reason === 'not-jpeg');
-const heicBuf = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63]).buffer;
-assert('EXIF：HEIC 明确标记不支持', exifMod.parseExif(heicBuf).reason === 'heic');
+// 17b. HEIC（ISO-BMFF）通道：1.2.0 新增，返回契约与 JPEG 完全一致
+const heicBj = exifMod.parseExif(buildHeic());
+assert('HEIC：解析出 GPS 坐标（39.9074 / 116.3914）',
+  heicBj.ok === true && Math.abs(heicBj.lat - 39.9074) < 0.01 && Math.abs(heicBj.lng - 116.3914) < 0.01,
+  `lat=${heicBj.lat} lng=${heicBj.lng}`);
+assert('HEIC：解析出拍摄日期', heicBj.date === '2023-07-15' && heicBj.takenAt === '2023:07:15 10:22:31', heicBj.date);
+assert('HEIC：返回字段与 JPEG 完全一致',
+  Object.keys(heicBj).sort().join(',') === Object.keys(ex).sort().join(','),
+  Object.keys(heicBj).join(','));
+assert('HEIC：数据块不带 Exif\\0\\0 前缀也能定位 TIFF 头',
+  exifMod.parseExif(buildHeic({ prefix: false })).ok === true);
+assert('HEIC：iloc v1 + construction_method=1（数据在 idat 内）也能解析',
+  exifMod.parseExif(buildHeic({ idat: true })).ok === true);
+assert('HEIC：缺 iinf 时按 TIFF 头校验回退定位',
+  exifMod.parseExif(buildHeic({ withIinf: false })).ok === true);
+const heicS = exifMod.parseExif(buildHeic({
+  little: false, latRef: 'S', lngRef: 'W', latDms: [33, 51, 54], lngDms: [70, 39, 21], dateStr: '2017-02-03 09:00:00'
+}));
+assert('HEIC：大端 + 南纬/西经取负值', heicS.ok && heicS.lat < 0 && heicS.lng < 0, `lat=${heicS.lat} lng=${heicS.lng}`);
+const heicNoGps = exifMod.parseExif(buildHeic({ withGps: false }));
+assert('HEIC：无 GPS → 标记跳过而不是猜', heicNoGps.ok === false && heicNoGps.reason === 'no-gps');
+const heicTruncated = exifMod.parseExif(new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63]).buffer);
+assert('HEIC：截断/坏文件不崩也不猜（bad-heic）', heicTruncated.ok === false && heicTruncated.reason === 'bad-heic', heicTruncated.reason);
 
 // 18. 照片坐标 → 城市就近匹配（阈值内才命中）
 const hitBj = logic.matchCityWithin({ lat: 39.92, lng: 116.40 });
@@ -391,7 +511,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.1.1 / 111', manifestSrc.versionName === '1.1.1' && manifestSrc.versionCode === '111');
+assert('版本：1.2.0 / 120', manifestSrc.versionName === '1.2.0' && manifestSrc.versionCode === '120');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -426,5 +546,70 @@ assert('1.1.1 顶部：取不到胶囊时兜底「状态栏 + 96rpx」',
   /statusBarHeight \|\| 20\) \+ 96/.test(mapSrc));
 assert('1.1.1 顶部：定位胶囊随统计卡同步下移',
   /top:\s*\(statsTop \+ 162\) \+ 'rpx'/.test(mapSrc));
+
+// 25. 1.2.0 导入升级：微信文件 GPX / KML 轨迹（纯本地解析，不联网）
+const track = await import('../src/utils/track.js');
+
+const gpxSample = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="headless">
+ <wpt lat="25.6065" lon="100.2676"><name>大理古城</name><time>2016-08-02T09:15:00Z</time></wpt>
+ <trk><name>滇西</name><trkseg>
+  <trkpt lat="26.8721" lon="100.2299"><ele>2400</ele><time>2018-03-11T10:20:00Z</time></trkpt>
+  <trkpt lat="39.9042" lon="116.4074"><time>2017-01-01T00:00:00Z</time></trkpt>
+  <trkpt lat="abc" lon="100.1000"/>
+  <trkpt lat="0" lon="0"/>
+  <trkpt lat="91" lon="100"/>
+ </trkseg></trk>
+</gpx>`;
+const gpxPts = track.parseGpxPoints(gpxSample);
+assert('GPX：解析 trkpt / wpt 的经纬度与 time', gpxPts.points.length === 3 && gpxPts.points[0].lat === 25.6065
+  && gpxPts.points[0].time === '2016-08-02T09:15:00Z', JSON.stringify(gpxPts.points));
+assert('GPX：非法坐标与 (0,0) 占位点全部跳过', !gpxPts.points.some(p => p.lat === 0 || Math.abs(p.lat) > 90));
+const gpxCities = track.citiesFromPoints(gpxPts.points, p => logic.matchCityWithin(p));
+assert('GPX：轨迹点复用 matchCityWithin 汇总成城市集合',
+  gpxCities.map(c => c.name).sort().join(',') === ['北京', '大理白族自治州', '丽江'].sort().join(','),
+  gpxCities.map(c => c.name).join(','));
+assert('GPX：每城取最早轨迹日期作年份',
+  gpxCities.find(c => c.name === '大理白族自治州').date === '2016-08-02'
+  && gpxCities.find(c => c.name === '北京').date === '2017-01-01', JSON.stringify(gpxCities));
+
+const kmlSample = `<kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark><LineString><coordinates>
+  100.2676,25.6065,2000 102.7125,25.0406,1890 116.4074,39.9042,44
+</coordinates></LineString></Placemark></Document></kml>`;
+const kmlPts = track.parseKmlPoints(kmlSample);
+assert('KML：解析 coordinates 三元组（lng,lat,alt）',
+  kmlPts.points.length === 3 && Math.abs(kmlPts.points[0].lng - 100.2676) < 1e-9 && Math.abs(kmlPts.points[0].lat - 25.6065) < 1e-9,
+  JSON.stringify(kmlPts.points));
+const kmlCities = track.citiesFromPoints(kmlPts.points, p => logic.matchCityWithin(p));
+assert('KML：不带时间信息 → 年份留空不编造', kmlCities.length === 3 && kmlCities.every(c => c.date === ''));
+assert('轨迹格式识别：扩展名 / 文件头，都不认识就 unknown',
+  track.detectTrackFormat('a.GPX', '') === 'gpx' && track.detectTrackFormat('b.kml', '') === 'kml'
+  && track.detectTrackFormat('c.txt', '<gpx>') === 'gpx' && track.detectTrackFormat('d.txt', 'hello') === 'unknown');
+
+// 抽样上限：3 万个互不重复的点 → 正好 5000 点参与城市匹配
+let bigGpx = '<gpx><trk><trkseg>';
+for (let i = 0; i < 30000; i++) {
+  const lat = 20 + Math.floor(i / 200) * 0.002;
+  const lng = 100 + (i % 200) * 0.002;
+  bigGpx += `<trkpt lat="${lat.toFixed(3)}" lon="${lng.toFixed(3)}"><time>2021-06-01T00:00:00Z</time></trkpt>`;
+}
+bigGpx += '</trkseg></trk></gpx>';
+const bigParsed = track.parseGpxPoints(bigGpx);
+assert('抽样：单文件最多取 5000 个轨迹点',
+  bigParsed.total === 30000 && bigParsed.points.length === track.TRACK_POINT_LIMIT,
+  `${bigParsed.total}/${bigParsed.points.length}`);
+
+// 补录页：第三个入口
+assert('补录页：第三个入口走 wx.chooseMessageFile，只认 gpx/kml，最多 20 个',
+  /chooseMessageFile/.test(importSrc) && /extension:\s*\[\s*'gpx'\s*,\s*'kml'\s*\]/.test(importSrc) &&
+  /count:\s*20/.test(importSrc));
+assert('补录页：三个入口按 ①②③ 排列，汇总卡改为 ④',
+  importSrc.includes('① 照片一键识别') && importSrc.includes('② 点选补录') &&
+  importSrc.includes('③ 从微信文件导入') && importSrc.includes('④ 待导入城市'));
+assert('补录页：轨迹通道同样明示不联网、不上传', importSrc.includes('不联网、不上传'));
+assert('补录页：HEIC 原图已改为支持（不再标为跳过）', importSrc.includes('HEIC 原图都支持'));
+assert('补录页：轨迹文件零命中计入跳过并给出原因',
+  /skipFileNoPoints/.test(importSrc) && /skipFileNoCity/.test(importSrc) && /skipFileRead/.test(importSrc));
+assert('补录页：解析结果统一走 importFootprints', /store\.importFootprints\(/.test(importSrc));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

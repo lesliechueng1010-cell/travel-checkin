@@ -8,7 +8,7 @@
       </view>
       <text class="tip">
         只在本机读取照片里的 GPS 与拍摄时间，匹配城市库。<text class="strong">照片本体绝不上传、也不联网</text>，解析完即丢弃。
-        一次最多 20 张，可多次添加。
+        JPEG 与 iPhone 的 HEIC 原图都支持。一次最多 20 张，可多次添加。
       </text>
       <button class="btn primary" style="margin-top:18rpx" @tap="pickPhotos">＋ 选照片识别</button>
 
@@ -18,7 +18,7 @@
         <text class="stat-skip" v-if="skipFar">· {{ skipFar }} 张坐标离城市库任何城市都超过 {{ matchKm }}km，已跳过</text>
         <text class="stat-skip" v-if="skipVisited">· {{ skipVisited }} 张所在城市已点亮，自动排除</text>
         <text class="stat-skip" v-if="skipNoDate">· {{ skipNoDate }} 张识别到城市但没有拍摄时间，年份留空</text>
-        <text class="stat-skip" v-if="skipUnsupported">· {{ skipUnsupported }} 张格式不支持或无 EXIF（如 PNG / HEIC 原图），已跳过</text>
+        <text class="stat-skip" v-if="skipUnsupported">· {{ skipUnsupported }} 张格式不支持或读不到 EXIF（如 PNG / WebP / 截屏 / 损坏的 HEIC），已跳过</text>
       </view>
     </view>
 
@@ -70,19 +70,42 @@
       </view>
     </view>
 
+    <!-- 路径三：从微信文件导入轨迹 -->
+    <view class="card">
+      <view class="row">
+        <text class="h3">③ 从微信文件导入</text>
+        <text class="tiny" v-if="fileTotal">已选 {{ fileTotal }} 个文件</text>
+      </view>
+      <text class="tip">
+        支持 <text class="strong">GPX / KML</text> 轨迹文件（运动 App、码表、Google Earth 导出的都行）。
+        把文件发给自己或任意聊天后从这里选。全程只在本机读取文本，<text class="strong">不联网、不上传、不留副本</text>。
+        一次最多 20 个，每个文件最多取 5000 个轨迹点。
+      </text>
+      <button class="btn ghost" style="margin-top:18rpx" @tap="pickTrackFiles">＋ 从聊天文件导入</button>
+
+      <view class="stat-box" v-if="fileTotal">
+        <text class="stat-line">已读 {{ fileParsed }} 个文件 · 识别到 {{ fileCityCount }} 座城市待确认</text>
+        <text class="stat-skip" v-if="skipFileNoPoints">· {{ skipFileNoPoints }} 个文件里没找到轨迹点（不是 GPX / KML，或内容为空）</text>
+        <text class="stat-skip" v-if="skipFileNoCity">· {{ skipFileNoCity }} 个文件的轨迹点离城市库任何城市都超过 {{ matchKm }}km，已跳过</text>
+        <text class="stat-skip" v-if="skipFileExt">· {{ skipFileExt }} 个文件不是 .gpx / .kml，已跳过</text>
+        <text class="stat-skip" v-if="skipFileRead">· {{ skipFileRead }} 个文件读不出来，已跳过</text>
+        <text class="stat-skip" v-if="skipFileVisited">· {{ skipFileVisited }} 座城市已点亮，自动排除</text>
+        <text class="stat-skip" v-if="kmlNoDateTip">· KML 不带时间信息，年份留空，可在下面手填</text>
+      </view>
+    </view>
+
     <!-- 待导入汇总 -->
     <view class="card">
       <view class="row">
-        <text class="h3">③ 待导入城市（{{ pending.length }}）</text>
+        <text class="h3">④ 待导入城市（{{ pending.length }}）</text>
         <text class="tiny link" v-if="pending.length" @tap="clearPending">全部清空</text>
       </view>
 
       <view v-if="!pending.length" class="empty">还没有待导入的城市，用上面任意一种方式添加</view>
-
       <view class="pend-row" v-for="(p, i) in pending" :key="p.name">
         <view class="pend-main">
           <text class="pend-name">{{ p.name }}</text>
-          <text class="pend-sub">{{ p.prov }} · {{ viaLabel(p.via) }}</text>
+          <text class="pend-sub">{{ p.prov }} · {{ viaLabel(p.src) }}</text>
         </view>
         <view class="year-box">
           <input
@@ -115,8 +138,10 @@ import store from '../../core/store.js';
 import { PROVINCES, citiesOfProv, searchCity, findCity } from '../../data/cities.js';
 import { GPS_MATCH_KM, matchCityWithin } from '../../core/logic.js';
 import { parseExif } from '../../utils/exif.js';
+import { parseTrackFile, citiesFromPoints } from '../../utils/track.js';
 
-const VIA_LABEL = { photo: '照片识别', pick: '点选补录', both: '照片 + 点选' };
+const VIA_META = { photo: '照片识别', pick: '点选补录', file: '轨迹文件' };
+const VIA_ORDER = ['photo', 'pick', 'file'];
 const shortProv = p => p.replace(/省|市|自治区|特别行政区|壮族|回族|维吾尔/g, '');
 
 /** 本地读文件为 ArrayBuffer（不经过网络） */
@@ -127,6 +152,21 @@ function readFileBuffer(filePath) {
       wx.getFileSystemManager().readFile({
         filePath,
         success: res => resolve(res.data || null),
+        fail: () => resolve(null)
+      });
+    } catch (e) { resolve(null); }
+  });
+}
+
+/** 本地按 utf-8 读文件为文本（GPX / KML，同样不经过网络） */
+function readFileText(filePath) {
+  return new Promise(resolve => {
+    try {
+      if (typeof wx === 'undefined' || !wx.getFileSystemManager) return resolve(null);
+      wx.getFileSystemManager().readFile({
+        filePath,
+        encoding: 'utf-8',
+        success: res => resolve(typeof res.data === 'string' ? res.data : null),
         fail: () => resolve(null)
       });
     } catch (e) { resolve(null); }
@@ -144,6 +184,15 @@ export default {
       skipVisited: 0,
       skipNoDate: 0,
       skipUnsupported: 0,
+      // 轨迹文件通道
+      fileTotal: 0,
+      fileParsed: 0,
+      skipFileNoPoints: 0,
+      skipFileNoCity: 0,
+      skipFileExt: 0,
+      skipFileRead: 0,
+      skipFileVisited: 0,
+      kmlNoDateTip: false,
       pending: [],
       visited: {},
       provinces: PROVINCES,
@@ -159,10 +208,13 @@ export default {
       return m;
     },
     pickCount() {
-      return this.pending.filter(p => p.via === 'pick' || p.via === 'both').length;
+      return this.pending.filter(p => (p.src || []).includes('pick')).length;
     },
     photoCityCount() {
-      return this.pending.filter(p => p.via === 'photo' || p.via === 'both').length;
+      return this.pending.filter(p => (p.src || []).includes('photo')).length;
+    },
+    fileCityCount() {
+      return this.pending.filter(p => (p.src || []).includes('file')).length;
     },
     curProvCities() {
       return this.curProv ? citiesOfProv(this.curProv) : [];
@@ -177,7 +229,11 @@ export default {
     this.pending = this.pending.filter(p => !this.visited[p.name]);
   },
   methods: {
-    viaLabel(v) { return VIA_LABEL[v] || '点选补录'; },
+    viaLabel(src) {
+      const list = Array.isArray(src) ? src : [];
+      const labels = VIA_ORDER.filter(k => list.includes(k)).map(k => VIA_META[k]);
+      return labels.length ? labels.join(' + ') : '点选补录';
+    },
     shortProv(p) { return shortProv(p); },
     refreshVisited() { this.visited = store.get().visited || {}; },
 
@@ -241,6 +297,57 @@ export default {
       }
     },
 
+    /* ---------- 路径三：微信文件（GPX / KML 轨迹） ---------- */
+    pickTrackFiles() {
+      if (typeof wx === 'undefined' || !wx.chooseMessageFile) {
+        uni.showToast({ title: '当前微信版本不支持从聊天文件导入', icon: 'none' });
+        return;
+      }
+      // 只认 .gpx / .kml，单次最多 20 个，可多次追加
+      wx.chooseMessageFile({
+        count: 20,
+        type: 'file',
+        extension: ['gpx', 'kml'],
+        success: res => this.handleTrackFiles(res.tempFiles || []),
+        fail: () => {}
+      });
+    },
+
+    async handleTrackFiles(files) {
+      const list = (files || []).filter(f => f && f.path).slice(0, 20);
+      if (!list.length) return;
+      uni.showLoading({ title: '本地解析轨迹', mask: true });
+      try {
+        for (const f of list) {
+          this.fileTotal++;
+          const name = f.name || '';
+          if (!/\.(gpx|kml)$/i.test(name)) { this.skipFileExt++; continue; }
+          const text = await readFileText(f.path);
+          if (!text) { this.skipFileRead++; continue; }
+
+          let parsed;
+          try { parsed = parseTrackFile(name, text); } catch (e) { parsed = { points: [], total: 0 }; }
+          if (!parsed.points || !parsed.points.length) { this.skipFileNoPoints++; continue; }
+
+          // 逐点复用 logic 的城市匹配，汇总成城市集合（每城取最早轨迹日期）
+          const cities = citiesFromPoints(parsed.points, loc => matchCityWithin(loc));
+          if (!cities.length) { this.skipFileNoCity++; continue; }
+
+          this.fileParsed++;
+          if (parsed.format === 'kml') this.kmlNoDateTip = true;   // KML 无时间信息，提示年份可手填
+          cities.forEach(c => {
+            const r = this.addPending(c.name, c.date ? c.date.slice(0, 4) : '', 'file');
+            if (r === 'visited') this.skipFileVisited++;
+          });
+        }
+      } finally {
+        uni.hideLoading();
+      }
+      if (!this.fileCityCount) {
+        uni.showToast({ title: '这些文件没能匹配到城市', icon: 'none', duration: 2200 });
+      }
+    },
+
     /* ---------- 待导入维护 ---------- */
     addPending(name, year, via) {
       const city = findCity(name);
@@ -249,14 +356,13 @@ export default {
       const idx = this.pending.findIndex(p => p.name === name);
       if (idx >= 0) {
         const it = this.pending[idx];
-        if (year) {
-          // 同一城市多张照片取最早年份（首次到访）
-          if (!it.year || Number(year) < Number(it.year)) it.year = year;
-        }
-        if (it.via !== via) it.via = 'both';
+        // 同一城市多次命中取最早年份（首次到访）
+        if (year && (!it.year || Number(year) < Number(it.year))) it.year = year;
+        if (!Array.isArray(it.src)) it.src = [];
+        if (!it.src.includes(via)) it.src.push(via);
         return 'merged';
       }
-      this.pending.push({ name, prov: city.prov, year: year || '', via });
+      this.pending.push({ name, prov: city.prov, year: year || '', src: [via] });
       return 'added';
     },
     toggleCity(name) {
