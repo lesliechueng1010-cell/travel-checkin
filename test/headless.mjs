@@ -511,7 +511,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.2.1 / 121', manifestSrc.versionName === '1.2.1' && manifestSrc.versionCode === '121');
+assert('版本：1.2.2 / 122', manifestSrc.versionName === '1.2.2' && manifestSrc.versionCode === '122');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -599,10 +599,17 @@ assert('抽样：单文件最多取 5000 个轨迹点',
   bigParsed.total === 30000 && bigParsed.points.length === track.TRACK_POINT_LIMIT,
   `${bigParsed.total}/${bigParsed.points.length}`);
 
-// 补录页：第三个入口
-assert('补录页：第三个入口走 wx.chooseMessageFile，只认 gpx/kml，最多 20 个',
-  /chooseMessageFile/.test(importSrc) && /extension:\s*\[\s*'gpx'\s*,\s*'kml'\s*\]/.test(importSrc) &&
+// 补录页：第三个入口（1.2.2 起含照片原图，修微信选图剥离定位）
+assert('补录页：第三个入口走 wx.chooseMessageFile，认 gpx/kml/heic/heif/jpg/jpeg，最多 20 个',
+  /chooseMessageFile/.test(importSrc) && /extension:\s*\[\s*'gpx'\s*,\s*'kml'\s*,\s*'heic'\s*,\s*'heif'\s*,\s*'jpg'\s*,\s*'jpeg'\s*\]/.test(importSrc) &&
   /count:\s*20/.test(importSrc));
+assert('1.2.2 文件通道：图片扩展名按正则分流，与轨迹分开处理',
+  /\(heic\|heif\|jpe\?g\)\$\/i/.test(importSrc) && /imagePaths\.push\(f\.path\)/.test(importSrc));
+assert('1.2.2 文件通道：图片原图并入照片通道（handleFiles 静默 toast，避免双提示）',
+  /handleFiles\(imagePaths,\s*\{\s*silentToast:\s*true\s*\}\)/.test(importSrc) &&
+  /opts\.silentToast/.test(importSrc));
+assert('1.2.2 文案：照片入口下有「微信选图剥离定位、改走文件导入」的如实提示',
+  importSrc.includes('微信选图时剥离了定位') && importSrc.includes('可完整保留定位'));
 assert('补录页：三个入口按 ①②③ 排列，汇总卡改为 ④',
   importSrc.includes('① 照片一键识别') && importSrc.includes('② 点选补录') &&
   importSrc.includes('③ 从微信文件导入') && importSrc.includes('④ 待导入城市'));

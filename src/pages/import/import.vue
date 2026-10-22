@@ -11,6 +11,9 @@
         JPEG 与 iPhone 的 HEIC 原图都支持。一次最多 20 张，可多次添加。
       </text>
       <button class="btn primary" style="margin-top:18rpx" @tap="pickPhotos">＋ 选照片识别</button>
+      <text class="tip" style="display:block;margin-top:14rpx">
+        若照片识别不到位置，多半是微信选图时剥离了定位；请把原图以文件形式发到微信，再从下方『③ 从微信文件导入』选，可完整保留定位。
+      </text>
 
       <view class="stat-box" v-if="photoTotal">
         <text class="stat-line">已解析 {{ photoParsed }} 张 · 识别到 {{ photoCityCount }} 座城市待确认</text>
@@ -77,9 +80,10 @@
         <text class="tiny" v-if="fileTotal">已选 {{ fileTotal }} 个文件</text>
       </view>
       <text class="tip">
-        支持 <text class="strong">GPX / KML</text> 轨迹文件（运动 App、码表、Google Earth 导出的都行）。
-        把文件发给自己或任意聊天后从这里选。全程只在本机读取文本，<text class="strong">不联网、不上传、不留副本</text>。
-        一次最多 20 个，每个文件最多取 5000 个轨迹点。
+        支持 <text class="strong">GPX / KML</text> 轨迹文件（运动 App、码表、Google Earth 导出的都行），也支持
+        <text class="strong">HEIC / JPEG 照片原图</text>——以文件形式发来的原图不经微信加工，定位信息完整保留。
+        把文件发给自己或任意聊天后从这里选。全程只在本机读取，<text class="strong">不联网、不上传、不留副本</text>。
+        一次最多 20 个，每个轨迹文件最多取 5000 个轨迹点。
       </text>
       <button class="btn ghost" style="margin-top:18rpx" @tap="pickTrackFiles">＋ 从聊天文件导入</button>
 
@@ -87,7 +91,7 @@
         <text class="stat-line">已读 {{ fileParsed }} 个文件 · 识别到 {{ fileCityCount }} 座城市待确认</text>
         <text class="stat-skip" v-if="skipFileNoPoints">· {{ skipFileNoPoints }} 个文件里没找到轨迹点（不是 GPX / KML，或内容为空）</text>
         <text class="stat-skip" v-if="skipFileNoCity">· {{ skipFileNoCity }} 个文件的轨迹点离城市库任何城市都超过 {{ matchKm }}km，已跳过</text>
-        <text class="stat-skip" v-if="skipFileExt">· {{ skipFileExt }} 个文件不是 .gpx / .kml，已跳过</text>
+        <text class="stat-skip" v-if="skipFileExt">· {{ skipFileExt }} 个文件不是支持的轨迹 / 图片文件，已跳过</text>
         <text class="stat-skip" v-if="skipFileRead">· {{ skipFileRead }} 个文件读不出来，已跳过</text>
         <text class="stat-skip" v-if="skipFileVisited">· {{ skipFileVisited }} 座城市已点亮，自动排除</text>
         <text class="stat-skip" v-if="kmlNoDateTip">· KML 不带时间信息，年份留空，可在下面手填</text>
@@ -263,7 +267,7 @@ export default {
       });
     },
 
-    async handleFiles(paths) {
+    async handleFiles(paths, opts = {}) {
       const list = paths.slice(0, 20);
       if (!list.length) return;
       uni.showLoading({ title: '本地解析中', mask: true });
@@ -292,22 +296,22 @@ export default {
       } finally {
         uni.hideLoading();
       }
-      if (!this.photoCityCount && this.photoTotal) {
+      if (!opts.silentToast && !this.photoCityCount && this.photoTotal) {
         uni.showToast({ title: '这些照片没能识别出可导入的城市', icon: 'none', duration: 2200 });
       }
     },
 
-    /* ---------- 路径三：微信文件（GPX / KML 轨迹） ---------- */
+    /* ---------- 路径三：微信文件（GPX / KML 轨迹 + HEIC / JPEG 照片原图） ---------- */
     pickTrackFiles() {
       if (typeof wx === 'undefined' || !wx.chooseMessageFile) {
         uni.showToast({ title: '当前微信版本不支持从聊天文件导入', icon: 'none' });
         return;
       }
-      // 只认 .gpx / .kml，单次最多 20 个，可多次追加
+      // 轨迹 .gpx / .kml + 照片原图 .heic / .heif / .jpg / .jpeg，单次最多 20 个，可多次追加
       wx.chooseMessageFile({
         count: 20,
         type: 'file',
-        extension: ['gpx', 'kml'],
+        extension: ['gpx', 'kml', 'heic', 'heif', 'jpg', 'jpeg'],
         success: res => this.handleTrackFiles(res.tempFiles || []),
         fail: () => {}
       });
@@ -316,11 +320,15 @@ export default {
     async handleTrackFiles(files) {
       const list = (files || []).filter(f => f && f.path).slice(0, 20);
       if (!list.length) return;
-      uni.showLoading({ title: '本地解析轨迹', mask: true });
+      const citiesBefore = this.fileCityCount + this.photoCityCount;
+      const imagePaths = [];
+      uni.showLoading({ title: '本地解析文件', mask: true });
       try {
         for (const f of list) {
           this.fileTotal++;
           const name = f.name || '';
+          // 照片原图：先攒下，循环后并入照片通道（同一套 parseExif + 匹配 + 确认清单）
+          if (/\.(heic|heif|jpe?g)$/i.test(name)) { imagePaths.push(f.path); continue; }
           if (!/\.(gpx|kml)$/i.test(name)) { this.skipFileExt++; continue; }
           const text = await readFileText(f.path);
           if (!text) { this.skipFileRead++; continue; }
@@ -343,7 +351,9 @@ export default {
       } finally {
         uni.hideLoading();
       }
-      if (!this.fileCityCount) {
+      // 以文件形式发来的照片原图不经微信选图加工，parseExif 能读到完整定位
+      if (imagePaths.length) await this.handleFiles(imagePaths, { silentToast: true });
+      if (this.fileCityCount + this.photoCityCount === citiesBefore) {
         uni.showToast({ title: '这些文件没能匹配到城市', icon: 'none', duration: 2200 });
       }
     },
