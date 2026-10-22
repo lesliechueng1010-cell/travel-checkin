@@ -21,7 +21,7 @@ export const CONFIG = JSON.parse(`{
 }`);
 
 export const BRAND = {
-  name: '旅行足迹打卡',
+  name: '行走健将',
   slogan: '点亮你去过的每一座城'
 };
 

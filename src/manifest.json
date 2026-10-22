@@ -1,5 +1,5 @@
 {
-  "name": "旅行足迹打卡",
+  "name": "行走健将",
   "appid": "",
   "description": "全国地图城市打卡 · 攻略 · 串线行程",
   "versionName": "1.0.0",
@@ -21,5 +21,5 @@
     }
   },
   "mp-alipay": { "usingComponents": true },
-  "h5": { "title": "旅行足迹打卡" }
+  "h5": { "title": "行走健将" }
 }
