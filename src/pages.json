@@ -1,18 +1,18 @@
 {
   "pages": [
-    { "path": "pages/map/map", "style": { "navigationStyle": "custom", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/wishlist/wishlist", "style": { "navigationBarTitleText": "想去清单", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/trip/trip", "style": { "navigationBarTitleText": "串线行程", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/my/my", "style": { "navigationBarTitleText": "我的足迹", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/city/detail", "style": { "navigationBarTitleText": "城市详情", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/import/import", "style": { "navigationBarTitleText": "导入历史足迹", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/poster/poster", "style": { "navigationBarTitleText": "足迹海报", "backgroundColor": "#0A1F2C" } },
-    { "path": "pages/safety/safety", "style": { "navigationBarTitleText": "安全角", "backgroundColor": "#0A1F2C" } }
+    { "path": "pages/map/map", "style": { "navigationStyle": "custom", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/wishlist/wishlist", "style": { "navigationBarTitleText": "想去清单", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/trip/trip", "style": { "navigationBarTitleText": "串线行程", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/my/my", "style": { "navigationBarTitleText": "我的足迹", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/city/detail", "style": { "navigationBarTitleText": "城市详情", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/import/import", "style": { "navigationBarTitleText": "导入历史足迹", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/poster/poster", "style": { "navigationBarTitleText": "足迹海报", "backgroundColor": "#0A1E34" } },
+    { "path": "pages/safety/safety", "style": { "navigationBarTitleText": "安全角", "backgroundColor": "#0A1E34" } }
   ],
   "tabBar": {
-    "color": "#8A9BA8",
-    "selectedColor": "#E8A838",
-    "backgroundColor": "#0D2535",
+    "color": "#7E93A8",
+    "selectedColor": "#D9B36A",
+    "backgroundColor": "#0A1E34",
     "borderStyle": "black",
     "list": [
       {
@@ -43,9 +43,9 @@
   },
   "globalStyle": {
     "navigationBarTextStyle": "white",
-    "navigationBarBackgroundColor": "#0D2535",
-    "backgroundColor": "#0A1F2C",
-    "app-plus": { "background": "#0A1F2C" }
+    "navigationBarBackgroundColor": "#0A1E34",
+    "backgroundColor": "#0A1E34",
+    "app-plus": { "background": "#0A1E34" }
   },
   "lazyCodeLoading": "requiredComponents"
 }

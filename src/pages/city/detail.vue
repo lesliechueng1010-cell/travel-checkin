@@ -315,11 +315,11 @@ export default {
         markers: pts.map((p, i) => ({
           id: i, latitude: p.lat, longitude: p.lng, width: 18, height: 18,
           iconPath: i === 0 ? '/static/icons/dot_green.png' : '/static/icons/dot_blue.png',
-          callout: { content: p.n, display: 'ALWAYS', fontSize: 10, bgColor: '#10161F', color: '#E8EDF2', padding: 4, borderRadius: 6 }
+          callout: { content: p.n, display: 'ALWAYS', fontSize: 10, bgColor: 'rgba(9,30,52,0.94)', color: '#F2EDE3', padding: 5, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(217,179,106,0.45)' }
         })),
         polyline: [{
           points: pts.map(p => { return { latitude: p.lat, longitude: p.lng }; }),
-          color: '#22C55E', width: 4, dottedLine: mode === 'straight'
+          color: '#D9B36A', width: 4, dottedLine: mode === 'straight'
         }],
         kmText: Math.round(km) + ' km',
         kmLabel: kmLabel(mode)
@@ -332,7 +332,7 @@ export default {
 </script>
 
 <style scoped>
-/* 封面渐变区 */
+/* 封面渐变区 · 底部罩色改深海蓝 */
 .city-cover {
   position: relative;
   padding: 48rpx 28rpx 36rpx;
@@ -341,15 +341,15 @@ export default {
 }
 .city-cover::after {
   content: '';
-  position: absolute; left: 0; right: 0; bottom: 0; height: 80rpx;
-  background: linear-gradient(180deg, transparent, rgba(10,31,44,0.55));
+  position: absolute; left: 0; right: 0; bottom: 0; height: 120rpx;
+  background: linear-gradient(180deg, transparent, rgba(10,30,52,0.92));
   pointer-events: none;
 }
 .cover-inner { position: relative; z-index: 1; }
 .cover-prov {
   display: block;
   font-size: 24rpx;
-  color: rgba(245,240,230,0.72);
+  color: rgba(242,237,227,0.62);
   letter-spacing: 4rpx;
   margin-bottom: 8rpx;
 }
@@ -357,9 +357,9 @@ export default {
   display: block;
   font-size: 56rpx;
   font-weight: 800;
-  color: #F5F0E6;
+  color: #F2EDE3;
   line-height: 1.15;
-  text-shadow: 0 4rpx 20rpx rgba(0,0,0,0.35);
+  text-shadow: 0 4rpx 22rpx rgba(0,0,0,0.42);
   margin-bottom: 12rpx;
 }
 .cover-chip { margin-top: 8rpx; }
@@ -369,84 +369,88 @@ export default {
 .cover-actions .btn { flex: 0 0 auto; }
 .checkin-btn {
   min-width: 200rpx;
-  box-shadow: 0 6rpx 20rpx rgba(232,168,56,0.4);
+  box-shadow: 0 8rpx 26rpx rgba(217,179,106,0.36);
 }
 .cover-visited {
   font-size: 22rpx;
-  color: rgba(245,240,230,0.65);
+  color: rgba(242,237,227,0.62);
   margin-top: 6rpx;
 }
-/* 封面在深色底上，补录标记改用暖金亮色保证可读 */
+/* 封面在深色底上，补录角标用香槟金 */
 .cover-visited .chip {
-  background: rgba(232,168,56,0.22);
-  color: #F0C060;
+  background: rgba(217,179,106,0.16);
+  border-color: rgba(217,179,106,0.55);
+  color: #E7C98C;
   margin-right: 8rpx;
 }
 
-/* 分区卡片内微调 */
-.guide-text { color: #3A4A55; font-size: 26rpx; line-height: 1.75; margin-top: 10rpx; display: block; }
+/* 分区卡片内微调（玻璃底：文字统一浅色） */
+.guide-text { color: rgba(242,237,227,0.62); font-size: 26rpx; line-height: 1.8; margin-top: 10rpx; display: block; }
 .chips-row { display: flex; flex-wrap: wrap; }
-.spot { padding: 18rpx 0; border-bottom: 1rpx solid rgba(26,42,50,0.08); }
+.spot { padding: 18rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
 .spot:last-child { border-bottom: none; }
-.spot-name { display: block; font-size: 28rpx; color: #1A2A32; margin-bottom: 6rpx; font-weight: 500; }
+.spot-name { display: block; font-size: 28rpx; color: #F2EDE3; margin-bottom: 6rpx; font-weight: 500; }
 .route-box {
-  background: rgba(10,31,44,0.04);
-  border-radius: 16rpx;
-  padding: 20rpx;
+  background: rgba(245,240,230,0.045);
+  border-radius: 24rpx;
+  padding: 22rpx;
   margin-top: 16rpx;
-  border: 1rpx solid rgba(10,31,44,0.06);
+  border: 1rpx solid rgba(245,240,230,0.09);
 }
 .route-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10rpx; }
-.route-name { font-size: 27rpx; font-weight: 600; color: #1A2A32; }
+.route-name { font-size: 27rpx; font-weight: 600; color: #F2EDE3; }
 .food-row { display: flex; flex-wrap: wrap; margin-top: 12rpx; }
 .shop-list { margin-top: 16rpx; }
-.shop { padding: 14rpx 0; border-bottom: 1rpx solid rgba(26,42,50,0.08); }
-.shop-name { font-size: 27rpx; color: #1A2A32; }
+.shop { padding: 16rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
+.shop-name { font-size: 27rpx; color: #F2EDE3; }
 
-/* 安全卡 · 暖红不刺眼 */
+/* 安全卡 · 暗底暖红不刺眼 */
 .safety-box { margin-top: 14rpx; }
-.safety-item { color: #5A6B78; font-size: 25rpx; line-height: 1.8; margin-top: 8rpx; }
-.danger-text { color: #8B4A42; font-size: 26rpx; line-height: 1.7; }
+.safety-item { color: rgba(242,237,227,0.62); font-size: 25rpx; line-height: 1.85; margin-top: 8rpx; }
+.danger-text { color: #E3A49A; font-size: 26rpx; line-height: 1.75; }
 
-/* 弹层 */
+/* 弹层 · 玻璃面板 */
 .mask {
   position: fixed; inset: 0;
-  background: rgba(5,15,22,0.62);
+  background: rgba(4,12,22,0.66);
   z-index: 30;
   display: flex; align-items: flex-end;
 }
 .sheet {
   width: 100%;
-  background: #F5F0E6;
-  border-radius: 28rpx 28rpx 0 0;
+  background: rgba(9, 30, 52, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 34rpx 34rpx 0 0;
+  border-top: 1rpx solid rgba(245,240,230,0.14);
   padding: 34rpx 30rpx 50rpx;
-  color: #1A2A32;
-  box-shadow: 0 -8rpx 40rpx rgba(0,0,0,0.25);
+  color: #F2EDE3;
+  box-shadow: 0 -12rpx 44rpx rgba(0,0,0,0.4);
 }
-.sheet .h2 { color: #1A2A32; }
+.sheet .h2 { color: #F2EDE3; }
 .sheet.wide { padding-bottom: 40rpx; }
 .form-row {
   display: flex; justify-content: space-between; align-items: center;
   margin-top: 24rpx; gap: 20rpx;
 }
-.form-row .sub { flex: 0 0 90rpx; color: #5A6B78; }
+.form-row .sub { flex: 0 0 90rpx; color: rgba(242,237,227,0.55); }
 .picker-value {
-  background: rgba(10,31,44,0.05);
-  border: 1rpx solid rgba(10,31,44,0.1);
-  border-radius: 12rpx; padding: 14rpx 24rpx;
-  color: #1A2A32; font-size: 26rpx;
+  background: rgba(245,240,230,0.05);
+  border: 1rpx solid rgba(245,240,230,0.16);
+  border-radius: 999rpx; padding: 14rpx 26rpx;
+  color: #F2EDE3; font-size: 26rpx;
 }
 .textarea { height: 120rpx; }
 .photo {
   width: 180rpx; height: 180rpx;
-  border-radius: 16rpx;
-  border: 1rpx solid rgba(10,31,44,0.1);
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(245,240,230,0.14);
 }
-.route-map { width: 100%; height: 520rpx; border-radius: 16rpx; margin-top: 16rpx; }
+.route-map { width: 100%; height: 520rpx; border-radius: 24rpx; margin-top: 16rpx; }
 .mileage-box { margin-top: 18rpx; display: flex; align-items: baseline; gap: 16rpx; }
-.mileage-num { font-size: 44rpx; font-weight: 800; color: #C48A1A; }
+.mileage-num { font-size: 46rpx; font-weight: 800; color: #D9B36A; }
 
-/* 打卡成功 · 光点扩散微动画（≤1s） */
+/* 打卡成功 · 香槟金光点扩散（≤1s） */
 .checkin-fx {
   position: fixed; inset: 0; z-index: 40;
   pointer-events: none;
@@ -455,15 +459,15 @@ export default {
 .fx-ring {
   width: 40rpx; height: 40rpx;
   border-radius: 50%;
-  border: 4rpx solid rgba(232,168,56,0.9);
+  border: 4rpx solid rgba(217,179,106,0.9);
   animation: ringOut 0.85s ease-out forwards;
 }
 .fx-spark {
   position: absolute;
   width: 10rpx; height: 10rpx;
   border-radius: 50%;
-  background: #F0C060;
-  box-shadow: 0 0 12rpx #E8A838;
+  background: #E7C98C;
+  box-shadow: 0 0 14rpx #D9B36A;
   animation: sparkFly 0.8s ease-out forwards;
 }
 .fx-spark.s1 { --dx: -80rpx; --dy: -60rpx; animation-delay: 0.05s; }

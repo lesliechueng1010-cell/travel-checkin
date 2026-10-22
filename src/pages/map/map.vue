@@ -62,6 +62,7 @@
             <view class="prov-head">
               <text class="prov-name">{{ p.prov }}</text>
               <text class="prov-count">{{ p.visited }}/{{ p.total }}</text>
+              <text class="prov-arrow">›</text>
             </view>
             <view class="bar"><view :style="{ width: p.pct + '%' }"></view></view>
           </view>
@@ -82,32 +83,15 @@
 
 <script>
 import store from '../../core/store.js';
-import { PROVINCES, CITIES, citiesOfProv, searchCity, findCity } from '../../data/cities.js';
+import { CITIES, citiesOfProv, searchCity, findCity } from '../../data/cities.js';
 import { locateCity } from '../../core/logic.js';
 
 const SHEET_KEY = 'tf.mapSheetOpen';
 
 const ICON = {
-  visited: '/static/icons/dot_green.png',
-  wish: '/static/icons/dot_orange.png',
-  none: '/static/icons/dot_gray.png',
-  provZero: '/static/icons/dot_gray.png',
-  provPart: '/static/icons/dot_orange.png',
-  provDone: '/static/icons/dot_green.png'
+  visited: '/static/icons/dot_green.png',   // 香槟金实心点（已打卡）
+  none: '/static/icons/dot_gray.png'        // 灰蓝小点（未打卡，无文字）
 };
-
-/* 全国视图气泡用单字简称 + 数字，缓解中部气泡重叠 */
-const PROV_ABBR = {
-  '北京市': '京', '天津市': '津', '上海市': '沪', '重庆市': '渝',
-  '河北省': '冀', '山西省': '晋', '辽宁省': '辽', '吉林省': '吉', '黑龙江省': '黑',
-  '江苏省': '苏', '浙江省': '浙', '安徽省': '皖', '福建省': '闽', '江西省': '赣', '山东省': '鲁',
-  '河南省': '豫', '湖北省': '鄂', '湖南省': '湘', '广东省': '粤', '海南省': '琼',
-  '四川省': '川', '贵州省': '贵', '云南省': '滇', '陕西省': '陕', '甘肃省': '甘', '青海省': '青',
-  '内蒙古自治区': '蒙', '广西壮族自治区': '桂', '西藏自治区': '藏',
-  '宁夏回族自治区': '宁', '新疆维吾尔自治区': '新',
-  '香港特别行政区': '港', '澳门特别行政区': '澳', '台湾省': '台'
-};
-const provAbbr = p => PROV_ABBR[p] || p.replace(/省|市|自治区|特别行政区|壮族|回族|维吾尔|区$/g, '');
 
 export default {
   data() {
@@ -152,29 +136,33 @@ export default {
       return done + '/' + list.length + ' 城已打卡';
     },
     markers() {
+      const v = this.visited;
       if (this.viewMode === 'nation') {
-        return PROVINCES.map((p, i) => {
-          const cities = citiesOfProv(p);
-          const done = cities.filter(c => this.visited[c.name]).length;
-          const cap = cities.find(c => c.cap) || cities[0];
-          const icon = done === 0 ? ICON.provZero : (done >= cities.length ? ICON.provDone : ICON.provPart);
-          return {
-            id: i, latitude: cap.lat, longitude: cap.lng, iconPath: icon, width: 20, height: 20,
-            joinCluster: false,
-            callout: {
-              content: provAbbr(p) + ' ' + done + '/' + cities.length,
-              display: 'ALWAYS', fontSize: 9, borderRadius: 4, bgColor: 'rgba(10,31,44,0.88)', color: '#F5F0E6', padding: 3, borderWidth: 1, borderColor: 'rgba(232,168,56,0.35)'
-            }
-          };
-        });
+        // 全国视图：只给已打卡城市亮金点，不挂任何文字气泡（各省进度气泡已全部移除）
+        return CITIES.filter(c => !!v[c.name]).map((c, i) => ({
+          id: 5000 + i, latitude: c.lat, longitude: c.lng,
+          iconPath: ICON.visited, width: 18, height: 18,
+          joinCluster: false, zIndex: 2
+        }));
       }
       const cities = citiesOfProv(this.curProv);
       return cities.map((c, i) => {
-        const icon = this.visited[c.name] ? ICON.visited : (this.wish.includes(c.name) ? ICON.wish : ICON.none);
-        return {
-          id: 1000 + i, latitude: c.lat, longitude: c.lng, iconPath: icon, width: 22, height: 22,
-          callout: { content: c.name + (this.visited[c.name] ? ' ✓' : ''), display: 'BYCLICK', fontSize: 11, borderRadius: 6, bgColor: 'rgba(10,31,44,0.92)', color: '#F5F0E6', padding: 5, borderWidth: 1, borderColor: 'rgba(245,240,230,0.2)' }
+        const done = !!v[c.name];
+        const m = {
+          id: 1000 + i, latitude: c.lat, longitude: c.lng,
+          // 已打卡：金点 + 点按看城市名；未打卡：只剩一个无文字浅灰小点
+          iconPath: done ? ICON.visited : ICON.none,
+          width: done ? 22 : 12, height: done ? 22 : 12,
+          joinCluster: false, zIndex: done ? 2 : 1
         };
+        if (done) {
+          m.callout = {
+            content: c.name, display: 'BYCLICK', fontSize: 11, borderRadius: 8,
+            bgColor: 'rgba(9,30,52,0.94)', color: '#F2EDE3',
+            padding: 6, borderWidth: 1, borderColor: 'rgba(217,179,106,0.55)'
+          };
+        }
+        return m;
       });
     }
   },
@@ -211,8 +199,10 @@ export default {
     onMarkerTap(e) {
       const id = e.detail && (e.detail.markerId !== undefined ? e.detail.markerId : e.detail.markerID);
       if (this.viewMode === 'nation') {
-        const p = PROVINCES[id];
-        if (p) this.drill(p);
+        // 全国视图的标记就是已打卡城市本身，点开城市详情
+        const list = CITIES.filter(c => !!this.visited[c.name]);
+        const c = list[id - 5000];
+        if (c) this.goDetail(c.name);
       } else {
         const c = citiesOfProv(this.curProv)[id - 1000];
         if (c) this.goDetail(c.name);
@@ -244,99 +234,105 @@ export default {
 .map-page { position: relative; height: 100vh; overflow: hidden; }
 .the-map { width: 100%; height: 100vh; }
 
-/* 顶部毛玻璃悬浮统计卡 */
+/* 顶部统计卡 · 玻璃大圆角 + 香槟金大数字 */
 .stats-bar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 5;
   padding: 70rpx 24rpx 12rpx;
-  background: linear-gradient(180deg, rgba(10,31,44,.88) 50%, rgba(10,31,44,0));
+  background: linear-gradient(180deg, rgba(10,30,52,0.94) 55%, rgba(10,30,52,0));
 }
 .stats-inner {
-  background: rgba(13, 37, 53, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(9, 30, 52, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1rpx solid rgba(245, 240, 230, 0.14);
-  border-radius: 20rpx;
-  padding: 22rpx 26rpx 18rpx;
+  border-radius: 32rpx;
+  padding: 24rpx 28rpx 20rpx;
   display: flex; align-items: center; justify-content: space-between;
-  box-shadow: 0 10rpx 32rpx rgba(0,0,0,0.28);
+  box-shadow: 0 14rpx 38rpx rgba(0, 0, 0, 0.32);
 }
 .stat-main { display: flex; align-items: center; gap: 18rpx; }
 .stat-num-wrap { display: flex; align-items: baseline; gap: 4rpx; }
 .stat-num {
-  font-size: 60rpx; font-weight: 800; line-height: 1;
-  color: #E8A838;
-  text-shadow: 0 2rpx 12rpx rgba(232,168,56,0.35);
+  font-size: 64rpx; font-weight: 800; line-height: 1;
+  color: #D9B36A;
+  text-shadow: 0 4rpx 18rpx rgba(217, 179, 106, 0.32);
 }
-.stat-unit { font-size: 22rpx; color: #C48A1A; font-weight: 600; }
+.stat-unit { font-size: 22rpx; color: #B8934F; font-weight: 600; }
 .stat-meta { display: flex; flex-direction: column; gap: 4rpx; }
-.stat-cap { display: block; font-size: 24rpx; color: #F5F0E6; font-weight: 500; }
-.stat-sub { display: block; font-size: 20rpx; color: #8A9BA8; }
+.stat-cap { display: block; font-size: 24rpx; color: #F2EDE3; font-weight: 500; }
+.stat-sub { display: block; font-size: 20rpx; color: rgba(242, 237, 227, 0.55); }
 .stat-actions { text-align: right; }
 .search-box {
-  font-size: 22rpx; color: #C8D0D8;
-  background: rgba(245,240,230,0.08);
-  border: 1rpx solid rgba(245,240,230,0.12);
-  border-radius: 14rpx; padding: 12rpx 20rpx;
+  font-size: 22rpx; color: #D9B36A;
+  background: rgba(217, 179, 106, 0.10);
+  border: 1rpx solid rgba(217, 179, 106, 0.42);
+  border-radius: 999rpx; padding: 12rpx 24rpx;
 }
 .search-input {
   width: 260rpx;
-  background: rgba(10,31,44,0.5);
-  border: 1rpx solid rgba(245,240,230,0.18);
-  border-radius: 14rpx; padding: 10rpx 16rpx;
-  font-size: 22rpx; color: #F5F0E6;
+  background: rgba(245, 240, 230, 0.06);
+  border: 1rpx solid rgba(245, 240, 230, 0.16);
+  border-radius: 999rpx; padding: 10rpx 22rpx;
+  font-size: 22rpx; color: #F2EDE3;
 }
 
-/* 渐变进度条 */
+/* 渐变进度条 · 香槟金 */
 .progress-track {
-  margin-top: 14rpx;
+  margin-top: 16rpx;
   height: 10rpx;
   border-radius: 999rpx;
-  background: rgba(245,240,230,0.1);
+  background: rgba(245, 240, 230, 0.10);
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #C48A1A 0%, #E8A838 55%, #F0C060 100%);
-  box-shadow: 0 0 12rpx rgba(232,168,56,0.45);
+  background: linear-gradient(90deg, #B8934F 0%, #D9B36A 55%, #E7C98C 100%);
+  box-shadow: 0 0 14rpx rgba(217, 179, 106, 0.42);
   transition: width 0.4s ease;
 }
 
+/* 定位提示 · 独立玻璃胶囊（金字、单行不换行） */
 .loc-banner {
-  position: absolute; top: 230rpx; left: 24rpx; right: 24rpx; z-index: 5;
+  position: absolute; top: 232rpx; left: 24rpx; right: 24rpx; z-index: 5;
   display: block;
-  background: rgba(232,168,56,0.16);
-  border: 1rpx solid rgba(232,168,56,0.42);
-  color: #F5F0E6;
-  font-size: 22rpx; border-radius: 16rpx; padding: 14rpx 20rpx;
+  background: rgba(9, 30, 52, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1rpx solid rgba(217, 179, 106, 0.42);
+  color: #D9B36A;
+  font-size: 22rpx; border-radius: 999rpx; padding: 16rpx 26rpx;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.18);
+  box-shadow: 0 10rpx 26rpx rgba(0, 0, 0, 0.26);
 }
+.loc-banner .brand-text { color: #E7C98C; font-weight: 600; }
 
-/* 底部抽屉 */
+/* 底部抽屉 · 玻璃面板 */
 .bottom-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
-  background: rgba(13, 37, 53, 0.96);
-  border-radius: 28rpx 28rpx 0 0;
-  border-top: 1rpx solid rgba(245,240,230,0.12);
+  background: rgba(9, 30, 52, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 34rpx 34rpx 0 0;
+  border-top: 1rpx solid rgba(245, 240, 230, 0.14);
   max-height: 40vh;
   display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: 0 -8rpx 32rpx rgba(0,0,0,0.3);
+  box-shadow: 0 -12rpx 40rpx rgba(0, 0, 0, 0.34);
 }
 .sheet-handle {
-  flex: 0 0 auto; max-height: 8vh; padding: 18rpx 28rpx;
+  flex: 0 0 auto; max-height: 8vh; padding: 20rpx 28rpx;
   display: flex; justify-content: space-between; align-items: center;
 }
 .handle-left { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
 .sheet-title-row { display: flex; align-items: center; gap: 10rpx; min-width: 0; }
-.sheet-icon { flex: 0 0 auto; font-size: 22rpx; color: #E8A838; }
+.sheet-icon { flex: 0 0 auto; font-size: 22rpx; color: #D9B36A; }
 .sheet-title {
   flex: 0 1 auto; min-width: 0;
-  font-size: 26rpx; color: #F5F0E6; font-weight: 600;
+  font-size: 26rpx; color: #F2EDE3; font-weight: 600;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .sheet-summary {
-  font-size: 20rpx; color: #8A9BA8;
+  font-size: 20rpx; color: rgba(242, 237, 227, 0.55);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .handle-right {
@@ -345,14 +341,14 @@ export default {
 }
 /* 返回全国小胶囊（原顶部悬浮按钮收进标题栏） */
 .back-pill {
-  font-size: 20rpx; color: #F5F0E6; line-height: 1.4;
-  background: rgba(245,240,230,0.10);
-  border: 1rpx solid rgba(245,240,230,0.20);
-  border-radius: 999rpx; padding: 6rpx 16rpx;
+  font-size: 20rpx; color: #D9B36A; line-height: 1.4;
+  background: rgba(217, 179, 106, 0.10);
+  border: 1rpx solid rgba(217, 179, 106, 0.42);
+  border-radius: 999rpx; padding: 6rpx 18rpx;
   white-space: nowrap;
 }
 .sheet-arrow {
-  display: inline-block; font-size: 24rpx; color: #8A9BA8;
+  display: inline-block; font-size: 24rpx; color: rgba(242, 237, 227, 0.55);
   transition: transform .28s ease, opacity .2s ease; opacity: .9;
 }
 .sheet-arrow.rotate { transform: rotate(180deg); }
@@ -361,53 +357,63 @@ export default {
   overflow: hidden; overflow-x: hidden;
   transition: max-height .28s ease, opacity .22s ease;
 }
-.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 28rpx 30rpx; overflow-x: hidden; }
+.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 24rpx 32rpx; overflow-x: hidden; }
 
-/* 省份行 · 半透明胶囊感
-   布局硬化（1.0.4 起改为绝对定位）：不再依赖 flex 收缩——
-   数字列 position:absolute 钉死在右端、脱离文档流，宽度 110rpx 固定，
-   任何屏宽下都不会被挤出屏幕；省名 margin-right:126rpx 给数字预留固定空间，
-   其余宽度用于自身，超出单行省略。 */
-.prov-row { padding: 16rpx 0; overflow: hidden; }
+/* 省份行 · 独立圆角玻璃卡（行距 12rpx）
+   布局沿用 1.0.4 的绝对定位：计数 position:absolute 钉右，脱离文档流、宽度固定，
+   任何屏宽都不会被挤出屏幕；省名给计数与行尾箭头预留固定空间，超出单行省略。 */
+.prov-row {
+  position: relative;
+  padding: 20rpx 22rpx;
+  margin-bottom: 12rpx;
+  border-radius: 24rpx;
+  background: rgba(245, 240, 230, 0.055);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+  overflow: hidden;
+}
+.prov-row:last-child { margin-bottom: 0; }
 .prov-head { position: relative; }
 .prov-name {
-  display: block; margin-right: 126rpx;
+  display: block; margin-right: 168rpx;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  font-size: 26rpx; color: #F5F0E6;
-  background: rgba(245, 240, 230, 0.08);
-  border: 1rpx solid rgba(245, 240, 230, 0.12);
-  border-radius: 999rpx;
-  padding: 6rpx 18rpx;
+  font-size: 27rpx; color: #F2EDE3; font-weight: 500;
 }
 .prov-count {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 40rpx; top: 50%; transform: translateY(-50%);
   width: 110rpx; text-align: right; white-space: nowrap;
-  font-size: 22rpx; color: #8A9BA8;
+  font-size: 22rpx; color: rgba(242, 237, 227, 0.55);
   font-variant-numeric: tabular-nums;
 }
-.prov-row .bar { margin-top: 12rpx; }
+.prov-arrow {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  font-size: 26rpx; color: #D9B36A; line-height: 1;
+}
+.prov-row .bar { margin-top: 16rpx; height: 8rpx; }
 
 /* 省视图城市行：同样绝对定位钉右，城市名预留 90rpx，右侧徽标/箭头永不被挤掉 */
 .city-row {
   position: relative;
-  padding: 22rpx 0;
+  padding: 22rpx 22rpx;
+  margin-bottom: 10rpx;
+  border-radius: 22rpx;
+  background: rgba(245, 240, 230, 0.045);
+  border: 1rpx solid rgba(245, 240, 230, 0.08);
   overflow: hidden;
-  border-bottom: 1rpx solid rgba(245, 240, 230, 0.08);
 }
 .city-name {
   display: block; margin-right: 90rpx;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  font-size: 28rpx; color: #8A9BA8;
+  font-size: 28rpx; color: rgba(242, 237, 227, 0.65);
 }
-.city-name.visited { color: #E8A838; font-weight: 500; }
+.city-name.visited { color: #D9B36A; font-weight: 500; }
 .city-right {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 14rpx; top: 50%; transform: translateY(-50%);
   display: flex; flex-direction: row; align-items: center;
   white-space: nowrap;
 }
 /* 右列整体收在 90rpx 预留区内：徽标在此处用紧凑规格，避免压到城市名 */
 .city-right .chip { font-size: 20rpx; padding: 2rpx 10rpx; margin-right: 6rpx; }
 .city-arrow {
-  flex: 0 0 auto; font-size: 22rpx; color: #8A9BA8; margin-left: 8rpx;
+  flex: 0 0 auto; font-size: 22rpx; color: rgba(242, 237, 227, 0.45); margin-left: 8rpx;
 }
 </style>

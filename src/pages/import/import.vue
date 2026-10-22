@@ -319,15 +319,18 @@ export default {
 <style scoped>
 .tip {
   display: block; margin-top: 12rpx;
-  font-size: 22rpx; color: #7A8B98; line-height: 1.6;
+  font-size: 22rpx; color: rgba(242, 237, 227, 0.55); line-height: 1.6;
 }
-.strong { color: #B87A12; font-weight: 600; }
+.strong { color: #D9B36A; font-weight: 600; }
+/* 统计提示区 · 玻璃卡 */
 .stat-box {
-  margin-top: 18rpx; padding: 18rpx 20rpx;
-  background: rgba(13, 37, 53, 0.06); border-radius: 14rpx;
+  margin-top: 18rpx; padding: 20rpx 22rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+  border-radius: 24rpx;
 }
-.stat-line { display: block; font-size: 24rpx; color: #1A2A32; font-weight: 500; }
-.stat-skip { display: block; margin-top: 6rpx; font-size: 21rpx; color: #8A9BA8; line-height: 1.5; }
+.stat-line { display: block; font-size: 24rpx; color: #F2EDE3; font-weight: 500; }
+.stat-skip { display: block; margin-top: 6rpx; font-size: 21rpx; color: rgba(242, 237, 227, 0.48); line-height: 1.5; }
 
 .search-input { margin-top: 18rpx; }
 
@@ -342,15 +345,15 @@ export default {
   padding: 14rpx 6rpx;
   margin-bottom: 10rpx;
   text-align: center;
-  font-size: 24rpx; color: #3A4A55;
-  background: rgba(26, 42, 50, 0.05);
+  font-size: 24rpx; color: rgba(242, 237, 227, 0.62);
+  background: rgba(245, 240, 230, 0.05);
   border: 1rpx solid transparent;
-  border-radius: 12rpx;
+  border-radius: 16rpx;
 }
 .prov-cell.active {
-  background: rgba(232, 168, 56, 0.20);
-  border-color: rgba(196, 138, 26, 0.45);
-  color: #B87A12; font-weight: 600;
+  background: rgba(217, 179, 106, 0.14);
+  border-color: rgba(217, 179, 106, 0.55);
+  color: #D9B36A; font-weight: 600;
 }
 
 /* 城市行：弹性硬化，右侧徽标不被挤掉 */
@@ -358,20 +361,22 @@ export default {
 .city-line {
   display: flex; flex-direction: row; align-items: center;
   width: 100%; min-width: 0;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid rgba(26, 42, 50, 0.08);
+  padding: 20rpx 16rpx;
+  margin-bottom: 8rpx;
+  border-radius: 18rpx;
+  background: rgba(245, 240, 230, 0.035);
 }
-.check { flex: 0 0 auto; width: 44rpx; font-size: 30rpx; color: #8A9BA8; }
-.check.on { color: #C48A1A; }
+.check { flex: 0 0 auto; width: 44rpx; font-size: 30rpx; color: rgba(242, 237, 227, 0.38); }
+.check.on { color: #D9B36A; }
 .city-text {
   flex: 1 1 0%; min-width: 0; display: block;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  font-size: 28rpx; color: #1A2A32;
+  font-size: 28rpx; color: #F2EDE3;
 }
-.city-text.done { color: #8A9BA8; text-decoration: line-through; }
+.city-text.done { color: rgba(242, 237, 227, 0.38); text-decoration: line-through; }
 .city-prov {
   flex: 0 0 auto; margin-left: 12rpx;
-  font-size: 21rpx; color: #8A9BA8;
+  font-size: 21rpx; color: rgba(242, 237, 227, 0.48);
   max-width: 40%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .city-line .chip { flex: 0 0 auto; margin-left: 12rpx; margin-right: 0; }
@@ -380,24 +385,28 @@ export default {
 .pend-row {
   display: flex; flex-direction: row; align-items: center;
   width: 100%; min-width: 0;
-  padding: 18rpx 0; border-bottom: 1rpx solid rgba(26, 42, 50, 0.08);
+  padding: 18rpx 16rpx; margin-bottom: 8rpx;
+  border-radius: 20rpx;
+  background: rgba(245, 240, 230, 0.045);
 }
 .pend-main { flex: 1 1 0%; min-width: 0; }
-.pend-name { display: block; font-size: 28rpx; color: #1A2A32; font-weight: 500; }
+.pend-name { display: block; font-size: 28rpx; color: #F2EDE3; font-weight: 500; }
 .pend-sub {
-  display: block; margin-top: 4rpx; font-size: 21rpx; color: #8A9BA8;
+  display: block; margin-top: 4rpx; font-size: 21rpx; color: rgba(242, 237, 227, 0.48);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .year-box {
   flex: 0 0 auto; display: flex; flex-direction: row; align-items: center;
   margin-left: 12rpx;
-  background: rgba(26, 42, 50, 0.06); border-radius: 10rpx; padding: 6rpx 12rpx;
+  background: rgba(245, 240, 230, 0.06);
+  border: 1rpx solid rgba(245, 240, 230, 0.12);
+  border-radius: 999rpx; padding: 6rpx 14rpx;
 }
-.year-input { width: 100rpx; text-align: right; font-size: 26rpx; color: #1A2A32; }
-.year-unit { font-size: 22rpx; color: #8A9BA8; margin-left: 4rpx; }
-.pend-del { flex: 0 0 auto; margin-left: 14rpx; padding: 8rpx; font-size: 24rpx; color: #B54A3C; }
+.year-input { width: 100rpx; text-align: right; font-size: 26rpx; color: #F2EDE3; }
+.year-unit { font-size: 22rpx; color: rgba(242, 237, 227, 0.55); margin-left: 4rpx; }
+.pend-del { flex: 0 0 auto; margin-left: 14rpx; padding: 8rpx; font-size: 24rpx; color: #E3A49A; }
 
 .import-btn { margin-top: 24rpx; }
 .foot-tip { margin-top: 14rpx; }
-.link { color: #C48A1A; }
+.link { color: #D9B36A; }
 </style>

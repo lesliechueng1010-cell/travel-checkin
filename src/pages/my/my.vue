@@ -55,8 +55,9 @@
 
     <!-- 导入历史足迹入口（统计卡下方） -->
     <view class="card import-card" @tap="goImport">
+      <view class="import-icon">↓</view>
       <view class="import-main">
-        <text class="import-title">📥 导入历史足迹</text>
+        <text class="import-title">导入历史足迹</text>
         <text class="import-desc">照片识别拍摄地点与年份，或按省→市点选补录；已点亮的城市自动跳过</text>
       </view>
       <text class="import-arrow">›</text>
@@ -308,91 +309,111 @@ export default {
 .avatar-btn::after { border: none; }
 .avatar {
   width: 120rpx; height: 120rpx; border-radius: 60rpx;
-  background: rgba(245,240,230,0.08); border: 1rpx solid rgba(245,240,230,0.18);
+  background: rgba(245, 240, 230, 0.06);
+  border: 2rpx solid rgba(217, 179, 106, 0.45);
   display: flex; align-items: center; justify-content: center;
-  font-size: 44rpx; color: #8A9BA8;
+  font-size: 44rpx; color: rgba(242, 237, 227, 0.55);
 }
-.avatar-empty { color: #8A9BA8; }
+.avatar-empty { color: rgba(242, 237, 227, 0.45); }
 .profile-info { flex: 1; min-width: 0; }
-.nick-text { display: block; font-size: 32rpx; color: #F5F0E6; }
+.nick-text { display: block; font-size: 32rpx; color: #F2EDE3; }
 .nick-input {
-  background: rgba(10,31,44,0.45); border: 1rpx solid rgba(245,240,230,0.18); border-radius: 12rpx;
-  padding: 12rpx 18rpx; font-size: 30rpx; color: #F5F0E6; width: 100%;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.16);
+  border-radius: 16rpx;
+  padding: 12rpx 18rpx; font-size: 30rpx; color: #F2EDE3; width: 100%;
 }
-.nick-tip { display: block; font-size: 20rpx; color: #8A9BA8; margin-top: 6rpx; line-height: 1.5; }
-.stats-hero { display: flex; gap: 20rpx; }
-.hero-item { flex: 1; background: rgba(13,37,53,0.9); border-radius: 16rpx; padding: 22rpx; text-align: center; }
-.hero-num { display: block; font-size: 42rpx; font-weight: 800; color: #E8A838; margin-bottom: 8rpx; }
-.hero-item .tiny { color: #C8D0D8; }
+.nick-tip { display: block; font-size: 20rpx; color: rgba(242, 237, 227, 0.55); margin-top: 6rpx; line-height: 1.5; }
 
-/* 导入历史足迹入口卡 */
-.import-card { display: flex; flex-direction: row; align-items: center; gap: 18rpx; }
+/* 统计区 · 玻璃小卡 + 香槟金数字 */
+.stats-hero { display: flex; gap: 16rpx; }
+.hero-item {
+  flex: 1;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+  border-radius: 24rpx; padding: 24rpx 16rpx; text-align: center;
+}
+.hero-num { display: block; font-size: 44rpx; font-weight: 800; color: #D9B36A; margin-bottom: 8rpx; }
+.hero-item .tiny { color: rgba(242, 237, 227, 0.55); }
+
+/* 导入历史足迹入口卡 · 金色图标 */
+.import-card { display: flex; flex-direction: row; align-items: center; gap: 20rpx; }
+.import-icon {
+  flex: 0 0 auto; width: 72rpx; height: 72rpx; border-radius: 50%;
+  border: 1rpx solid rgba(217, 179, 106, 0.55);
+  background: rgba(217, 179, 106, 0.12);
+  color: #D9B36A; font-size: 32rpx; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
 .import-main { flex: 1 1 0%; min-width: 0; }
-.import-title { display: block; font-size: 30rpx; font-weight: 600; color: #1A2A32; }
+.import-title { display: block; font-size: 30rpx; font-weight: 600; color: #F2EDE3; }
 .import-desc {
-  display: block; margin-top: 6rpx; font-size: 22rpx; color: #7A8B98; line-height: 1.5;
+  display: block; margin-top: 6rpx; font-size: 22rpx;
+  color: rgba(242, 237, 227, 0.55); line-height: 1.5;
   overflow: hidden;
 }
-.import-arrow { flex: 0 0 auto; font-size: 32rpx; color: #C48A1A; }
+.import-arrow { flex: 0 0 auto; font-size: 32rpx; color: #D9B36A; }
 
-/* 成就徽章：一排横向滚动，未解锁灰显 */
+/* 成就徽章：一排横向滚动，未解锁灰调 / 已解锁香槟金描边 */
 .badge-scroll { width: 100%; margin-top: 18rpx; white-space: nowrap; }
 .badge-row { display: inline-flex; flex-direction: row; align-items: stretch; }
 .badge {
   width: 200rpx; flex: 0 0 200rpx; margin-right: 16rpx;
-  padding: 20rpx 12rpx 18rpx;
-  border-radius: 16rpx;
-  background: rgba(232,168,56,0.10);
-  border: 1rpx solid rgba(196,138,26,0.22);
+  padding: 22rpx 12rpx 18rpx;
+  border-radius: 24rpx;
+  background: rgba(217, 179, 106, 0.10);
+  border: 1rpx solid rgba(217, 179, 106, 0.45);
   text-align: center; white-space: normal;
 }
 .badge:last-child { margin-right: 0; }
 .badge.locked {
-  background: rgba(26,42,50,0.05);
-  border-color: rgba(26,42,50,0.10);
-  opacity: .62;
+  background: rgba(245, 240, 230, 0.035);
+  border-color: rgba(245, 240, 230, 0.10);
+  opacity: .58;
 }
 .badge-icon {
   width: 76rpx; height: 76rpx; border-radius: 50%; margin: 0 auto 12rpx;
-  background: linear-gradient(135deg, #E8A838 0%, #D4922A 100%);
+  background: linear-gradient(135deg, #E7C98C 0%, #D9B36A 60%, #C9A45C 100%);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4rpx 14rpx rgba(232,168,56,0.35);
+  box-shadow: 0 6rpx 18rpx rgba(217, 179, 106, 0.30);
 }
 .badge.locked .badge-icon {
-  background: rgba(26,42,50,0.10);
+  background: rgba(245, 240, 230, 0.08);
   box-shadow: none;
 }
 .badge-emoji { font-size: 34rpx; line-height: 1; }
-.badge-title { display: block; font-size: 24rpx; font-weight: 600; color: #1A2A32; }
-.badge.locked .badge-title { color: #6B7C8A; }
+.badge-title { display: block; font-size: 24rpx; font-weight: 600; color: #F2EDE3; }
+.badge.locked .badge-title { color: rgba(242, 237, 227, 0.45); }
 .badge-sub {
   display: block; margin-top: 6rpx; font-size: 18rpx;
-  color: #C48A1A; line-height: 1.45;
+  color: #D9B36A; line-height: 1.45;
 }
-.badge.locked .badge-sub { color: #8A9BA8; }
+.badge.locked .badge-sub { color: rgba(242, 237, 227, 0.38); }
 .badge-tip { display: block; margin-top: 14rpx; }
 
 /* 最近足迹 */
 .foot-row {
   display: flex; flex-direction: row; align-items: center;
-  padding: 18rpx 0; border-bottom: 1rpx solid rgba(26,42,50,0.08);
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(245, 240, 230, 0.08);
 }
 .foot-row:last-child { border-bottom: none; padding-bottom: 0; }
 .foot-main { flex: 1 1 0%; min-width: 0; }
 .foot-line { display: flex; flex-direction: row; align-items: center; }
-.foot-name { font-size: 30rpx; color: #1A2A32; font-weight: 500; }
+.foot-name { font-size: 30rpx; color: #F2EDE3; font-weight: 500; }
 .foot-line .chip { margin-left: 12rpx; margin-right: 0; }
 .foot-sub {
-  display: block; margin-top: 6rpx; font-size: 22rpx; color: #7A8B98;
+  display: block; margin-top: 6rpx; font-size: 22rpx;
+  color: rgba(242, 237, 227, 0.55);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-.foot-arrow { flex: 0 0 auto; margin-left: 12rpx; font-size: 26rpx; color: #8A9BA8; }
+.foot-arrow { flex: 0 0 auto; margin-left: 12rpx; font-size: 26rpx; color: rgba(242, 237, 227, 0.45); }
 
 /* 空态 */
-.empty-ornament { font-size: 40rpx; color: rgba(196,138,26,0.55); margin-bottom: 12rpx; }
-.empty-title { display: block; font-size: 28rpx; color: #3A4A55; font-weight: 600; }
-.empty-desc { display: block; margin-top: 8rpx; font-size: 22rpx; color: #7A8B98; line-height: 1.5; }
+.empty-ornament { font-size: 40rpx; color: rgba(217, 179, 106, 0.55); margin-bottom: 12rpx; }
+.empty-title { display: block; font-size: 28rpx; color: #F2EDE3; font-weight: 600; }
+.empty-desc { display: block; margin-top: 8rpx; font-size: 22rpx; color: rgba(242, 237, 227, 0.55); line-height: 1.6; }
 .empty-actions { display: flex; flex-direction: row; justify-content: center; gap: 16rpx; margin-top: 22rpx; }
 .empty-actions .btn { flex: 0 0 auto; width: 250rpx; padding: 0; }
-.empty-actions .btn.ghost { color: #3A4A55; border-color: rgba(26,42,50,0.22); }
+.empty-actions .btn.ghost { color: #D9B36A; border-color: rgba(217, 179, 106, 0.42); }
 </style>

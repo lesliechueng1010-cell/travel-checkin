@@ -1,10 +1,18 @@
-/* ===== 行走健将 · 旅行手帐 × 国家地理 主题 ===== */
-/* 深青底（微渐变）· 米白卡片 · 暖橙金点亮色 */
+/* ===== 行走健将 · 1.1.0 深海蓝玻璃 × 香槟金 ===== */
+/* 深海蓝微渐变底 · 半透明玻璃面板 · 香槟金点缀 · 现代圆润 */
+
+/* 色板（全站唯一来源，页面里不要再写别的色）
+   底：      #0A1E34 → #0C2745（微渐变）
+   玻璃：    rgba(9,30,52,0.88) + backdrop blur
+   描边：    rgba(245,240,230,0.14)
+   香槟金：  #D9B36A（深 #B8934F / 浅 #E7C98C）
+   正文：    #F2EDE3
+   次级：    rgba(242,237,227,0.55) */
 
 page {
-  background: linear-gradient(165deg, #0A1F2C 0%, #0D2535 45%, #0B1E2A 100%);
+  background: linear-gradient(168deg, #0A1E34 0%, #0C2745 100%);
   background-attachment: fixed;
-  color: #F5F0E6;
+  color: #F2EDE3;
   font-size: 28rpx;
   font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
 }
@@ -12,92 +20,104 @@ view, text, button, input, textarea { box-sizing: border-box; }
 
 .page {
   min-height: 100vh;
-  background: linear-gradient(165deg, #0A1F2C 0%, #0D2535 45%, #0B1E2A 100%);
+  background: linear-gradient(168deg, #0A1E34 0%, #0C2745 100%);
   padding-bottom: 40rpx;
 }
 .pad { padding: 24rpx; }
 
-/* 卡片 · 米白 + 柔和阴影 + 大圆角 */
+/* 玻璃面板 · 大圆角 + 模糊 + 细描边 */
 .card {
-  background: #F5F0E6;
-  border: none;
-  border-radius: 20rpx;
-  padding: 28rpx;
+  background: rgba(9, 30, 52, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1rpx solid rgba(245, 240, 230, 0.14);
+  border-radius: 32rpx;
+  padding: 30rpx;
   margin: 20rpx 24rpx;
-  box-shadow: 0 8rpx 28rpx rgba(0, 0, 0, 0.22);
-  color: #1A2A32;
+  box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.26);
+  color: #F2EDE3;
 }
 .card-soft {
-  background: rgba(245, 240, 230, 0.92);
-  border-radius: 18rpx;
+  background: rgba(9, 30, 52, 0.66);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+  border-radius: 26rpx;
   padding: 24rpx;
-  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.16);
-  color: #1A2A32;
+  color: #F2EDE3;
 }
 
 /* 标题 */
-.h1 { font-size: 44rpx; font-weight: 700; color: #F5F0E6; }
-.h2 { font-size: 34rpx; font-weight: 700; color: #F5F0E6; }
-.h3 { font-size: 30rpx; font-weight: 600; color: #1A2A32; }
-.sub { font-size: 24rpx; color: #8A9BA8; }
-.tiny { font-size: 22rpx; color: #6B7C8A; }
-.brand-text { color: #E8A838; }
+.h1 { font-size: 44rpx; font-weight: 700; color: #F2EDE3; }
+.h2 { font-size: 34rpx; font-weight: 700; color: #F2EDE3; }
+.h3 { font-size: 30rpx; font-weight: 600; color: #F2EDE3; }
+.sub { font-size: 24rpx; color: rgba(242, 237, 227, 0.55); }
+.tiny { font-size: 22rpx; color: rgba(242, 237, 227, 0.55); }
+.brand-text { color: #D9B36A; }
 
-/* 卡片内文字覆盖（米白底上用深色） */
-.card .h1, .card .h2, .card .h3 { color: #1A2A32; }
-.card .sub { color: #5A6B78; }
-.card .tiny { color: #7A8B98; }
-.card .brand-text { color: #C48A1A; }
+/* 卡片内文字：同为浅色（玻璃底），略微收一点对比 */
+.card .h1, .card .h2, .card .h3 { color: #F2EDE3; }
+.card .sub { color: rgba(242, 237, 227, 0.55); }
+.card .tiny { color: rgba(242, 237, 227, 0.48); }
+.card .brand-text { color: #D9B36A; }
 
-/* 徽标 */
+/* 徽标 · 金字描边 */
 .chip {
   display: inline-flex; align-items: center;
   padding: 4rpx 16rpx; border-radius: 999rpx;
-  font-size: 22rpx; background: rgba(10, 31, 44, 0.08); color: #3A4A55;
+  font-size: 22rpx;
+  background: rgba(217, 179, 106, 0.10);
+  border: 1rpx solid rgba(217, 179, 106, 0.42);
+  color: #D9B36A;
   margin-right: 12rpx;
 }
-.chip.green { background: rgba(232, 168, 56, 0.18); color: #C48A1A; }
-.chip.orange { background: rgba(232, 168, 56, 0.22); color: #B87A12; }
-.chip.red { background: rgba(196, 86, 72, 0.14); color: #B54A3C; }
-.chip.blue { background: rgba(56, 140, 180, 0.14); color: #2A6A8A; }
+.chip.green { background: rgba(217,179,106,0.12); border-color: rgba(217,179,106,0.45); color: #D9B36A; }
+.chip.orange { background: rgba(217,179,106,0.16); border-color: rgba(217,179,106,0.55); color: #E7C98C; }
+.chip.red { background: rgba(214,122,110,0.12); border-color: rgba(214,122,110,0.45); color: #E3A49A; }
+.chip.blue { background: rgba(126,175,214,0.10); border-color: rgba(126,175,214,0.38); color: #A9CBE4; }
 
-/* 按钮 */
+/* 按钮 · 圆润胶囊 */
 .btn {
   display: flex; align-items: center; justify-content: center;
-  height: 84rpx; border-radius: 18rpx; font-size: 30rpx;
-  background: rgba(245, 240, 230, 0.12); color: #F5F0E6; border: none;
+  height: 88rpx; border-radius: 999rpx; font-size: 30rpx;
+  background: rgba(245, 240, 230, 0.06);
+  border: 1rpx solid rgba(245, 240, 230, 0.18);
+  color: #F2EDE3;
 }
 .btn::after { border: none; }
 .btn.primary {
-  background: linear-gradient(135deg, #E8A838 0%, #D4922A 100%);
-  color: #1A1408; font-weight: 700;
-  box-shadow: 0 6rpx 18rpx rgba(232, 168, 56, 0.35);
+  background: linear-gradient(135deg, #E7C98C 0%, #D9B36A 60%, #C9A45C 100%);
+  border: 1rpx solid rgba(231, 201, 140, 0.55);
+  color: #0A1E34; font-weight: 700;
+  box-shadow: 0 8rpx 24rpx rgba(217, 179, 106, 0.28);
 }
 .btn.ghost {
   background: transparent;
-  border: 1rpx solid rgba(245, 240, 230, 0.28);
-  color: #F5F0E6;
+  border: 1rpx solid rgba(217, 179, 106, 0.42);
+  color: #D9B36A;
 }
 .btn.warn {
-  background: rgba(232, 168, 56, 0.18);
-  color: #E8A838;
+  background: rgba(217, 179, 106, 0.14);
+  border: 1rpx solid rgba(217, 179, 106, 0.42);
+  color: #E7C98C;
 }
 .btn.danger {
-  background: rgba(196, 86, 72, 0.16);
-  color: #D07060;
+  background: rgba(214, 122, 110, 0.12);
+  border: 1rpx solid rgba(214, 122, 110, 0.38);
+  color: #E3A49A;
 }
-.btn.disabled { opacity: .45; }
-.btn.sm { height: 60rpx; font-size: 24rpx; border-radius: 14rpx; padding: 0 24rpx; }
+.btn.disabled { opacity: .42; }
+.btn.sm { height: 64rpx; font-size: 24rpx; border-radius: 999rpx; padding: 0 28rpx; }
 
-/* 进度条 · 暖金渐变 */
+/* 进度条 · 香槟金渐变 */
 .bar {
-  height: 12rpx; border-radius: 999rpx;
-  background: rgba(245, 240, 230, 0.12);
+  height: 10rpx; border-radius: 999rpx;
+  background: rgba(245, 240, 230, 0.10);
   overflow: hidden;
 }
 .bar > view {
   height: 100%; border-radius: 999rpx;
-  background: linear-gradient(90deg, #C48A1A, #E8A838, #F0C060);
+  background: linear-gradient(90deg, #B8934F 0%, #D9B36A 60%, #E7C98C 100%);
 }
 
 /* 列表行 */
@@ -109,37 +129,50 @@ view, text, button, input, textarea { box-sizing: border-box; }
 .row-item:last-child { border-bottom: none; }
 
 /* 分隔 */
-.divider { height: 1rpx; background: rgba(245, 240, 230, 0.1); margin: 20rpx 0; }
+.divider { height: 1rpx; background: rgba(245, 240, 230, 0.10); margin: 20rpx 0; }
 
-/* 输入 */
+/* 输入 · 同系深色玻璃 */
 .input, .textarea {
-  background: rgba(10, 31, 44, 0.06);
-  border: 1rpx solid rgba(10, 31, 44, 0.12);
-  border-radius: 16rpx;
-  padding: 20rpx; color: #1A2A32; font-size: 26rpx; width: 100%;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.16);
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx; color: #F2EDE3; font-size: 26rpx; width: 100%;
 }
 
-/* 空态 */
+/* 空态 · 次级文字 */
 .empty {
   text-align: center; padding: 80rpx 24rpx;
-  color: #8A9BA8; font-size: 26rpx;
+  color: rgba(242, 237, 227, 0.55); font-size: 26rpx;
 }
 
-/* 醒目警示块（危险注意事项专用 · 暖红不刺眼） */
+/* 醒目警示块（危险注意事项专用 · 暗底暖红） */
 .danger-block {
-  background: rgba(196, 86, 72, 0.12);
-  border: 2rpx solid rgba(196, 86, 72, 0.35);
-  border-radius: 18rpx; padding: 24rpx; margin: 20rpx 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(196, 86, 72, 0.1);
+  background: rgba(158, 66, 58, 0.18);
+  border: 1rpx solid rgba(214, 122, 110, 0.38);
+  border-radius: 28rpx; padding: 26rpx; margin: 20rpx 24rpx;
+  box-shadow: 0 10rpx 28rpx rgba(0, 0, 0, 0.22);
 }
 .danger-block .dt {
-  color: #C45648; font-weight: 700; font-size: 28rpx; margin-bottom: 12rpx;
+  color: #E3A49A; font-weight: 700; font-size: 28rpx; margin-bottom: 12rpx;
 }
 
-/* 通用提示条 */
+/* 通用提示条 · 玻璃 + 次级文字 */
 .notice {
-  background: rgba(56, 140, 180, 0.12);
-  border: 1rpx solid rgba(56, 140, 180, 0.28);
-  border-radius: 16rpx; padding: 18rpx;
-  color: #8A9BA8; font-size: 22rpx;
+  background: rgba(9, 30, 52, 0.72);
+  border: 1rpx solid rgba(245, 240, 230, 0.12);
+  border-radius: 22rpx; padding: 20rpx 22rpx;
+  color: rgba(242, 237, 227, 0.55); font-size: 22rpx;
+  line-height: 1.6;
+}
+
+/* 空状态（我的页/想去/行程共用） */
+.empty-block { padding: 56rpx 12rpx; }
+.empty-ornament {
+  font-size: 40rpx; color: rgba(217, 179, 106, 0.55); margin-bottom: 12rpx;
+  letter-spacing: 6rpx;
+}
+.empty-title { display: block; font-size: 28rpx; color: #F2EDE3; font-weight: 600; }
+.empty-desc {
+  display: block; margin-top: 8rpx; font-size: 22rpx;
+  color: rgba(242, 237, 227, 0.55); line-height: 1.6;
 }

@@ -140,20 +140,39 @@ export default {
 </script>
 
 <style scoped>
-.tabs { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 20rpx 0; }
-.tab { padding: 10rpx 26rpx; border-radius: 999rpx; background: rgba(245,240,230,0.08); color: #8A9BA8; font-size: 24rpx; }
-.tab.on { background: rgba(232,168,56,0.2); color: #E8A838; font-weight: 700; }
-.safety-item { color: #8A9BA8; font-size: 26rpx; line-height: 1.9; padding: 6rpx 0; }
+.tabs { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 22rpx 0; }
+.tab {
+  padding: 12rpx 28rpx; border-radius: 999rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.12);
+  color: rgba(242, 237, 227, 0.55); font-size: 24rpx;
+}
+.tab.on {
+  background: rgba(217, 179, 106, 0.14);
+  border-color: rgba(217, 179, 106, 0.55);
+  color: #D9B36A; font-weight: 700;
+}
+.safety-item {
+  color: rgba(242, 237, 227, 0.62);
+  font-size: 26rpx; line-height: 1.9; padding: 8rpx 0;
+}
 .sos-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  background: rgba(13,37,53,0.95); border-top: 2rpx solid #C45648;
-  display: flex; align-items: center; gap: 16rpx; padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: rgba(9, 30, 52, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1rpx solid rgba(214, 122, 110, 0.45);
+  display: flex; align-items: center; gap: 16rpx;
+  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
 }
 .sos-loc { flex: 1; min-width: 0; }
-.sos-cap { display: block; font-size: 20rpx; color: #8A9BA8; }
-.sos-city { display: block; font-size: 26rpx; color: #F5F0E6; margin-top: 4rpx; }
-.sos-btn { border-radius: 16rpx; color: #fff; font-size: 26rpx; font-weight: 700; height: 84rpx; line-height: 84rpx; padding: 0 34rpx; border: none; }
+.sos-cap { display: block; font-size: 20rpx; color: rgba(242, 237, 227, 0.55); }
+.sos-city { display: block; font-size: 26rpx; color: #F2EDE3; margin-top: 4rpx; }
+.sos-btn {
+  border-radius: 999rpx; font-size: 26rpx; font-weight: 700;
+  height: 84rpx; line-height: 84rpx; padding: 0 34rpx; border: none;
+}
 .sos-btn::after { border: none; }
-.call-110 { background: #C45648; }
-.call-120 { background: #E8A838; }
+.call-110 { background: #C45648; color: #FFF5F2; }
+.call-120 { background: linear-gradient(135deg, #E7C98C 0%, #D9B36A 100%); color: #0A1E34; }
 </style>

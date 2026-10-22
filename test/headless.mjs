@@ -319,19 +319,20 @@ const cityRowCss = block('.city-row');
 const cityNameCss = block('.city-name');
 const cityRightCss = block('.city-right');
 // 1.0.4 起改用绝对定位钉右，不再依赖 flex 收缩（真机 flex 方案仍会被切）
+// 1.1.0 省行改成独立圆角卡，计数右侧再让出 40rpx 给行尾 ›
 assert('抽屉：数字列绝对定位钉右、宽度固定、不换行',
-  /position:\s*absolute/.test(provCountCss) && /right:\s*0/.test(provCountCss) &&
+  /position:\s*absolute/.test(provCountCss) && /right:\s*\d+rpx/.test(provCountCss) &&
   /width:\s*110rpx/.test(provCountCss) && /white-space:\s*nowrap/.test(provCountCss) &&
   /text-align:\s*right/.test(provCountCss) && /translateY\(-50%\)/.test(provCountCss));
 assert('抽屉：省名块级 + 右侧预留固定宽度并可单行省略',
   /position:\s*relative/.test(provHeadCss) &&
-  /display:\s*block/.test(provNameCss) && /margin-right:\s*126rpx/.test(provNameCss) &&
+  /display:\s*block/.test(provNameCss) && /margin-right:\s*168rpx/.test(provNameCss) &&
   /white-space:\s*nowrap/.test(provNameCss) && /text-overflow:\s*ellipsis/.test(provNameCss) &&
   /overflow:\s*hidden/.test(provNameCss));
 assert('抽屉：城市行同样硬化（右列绝对定位 + 名称预留 90rpx）',
   /position:\s*relative/.test(cityRowCss) && /overflow:\s*hidden/.test(cityRowCss) &&
   /margin-right:\s*90rpx/.test(cityNameCss) && /text-overflow:\s*ellipsis/.test(cityNameCss) &&
-  /position:\s*absolute/.test(cityRightCss) && /right:\s*0/.test(cityRightCss));
+  /position:\s*absolute/.test(cityRightCss) && /right:\s*\d+rpx/.test(cityRightCss));
 assert('抽屉：省行/城市行均加 overflow:hidden 兜底',
   /overflow:\s*hidden/.test(provRowCss) && /overflow:\s*hidden/.test(cityRowCss));
 // 城市行右列预算：「想去」徽标 + 箭头必须收在 90rpx 预留区内，否则会压到城市名
@@ -368,5 +369,28 @@ assert('我的页：最近足迹 / 成就徽章 / 导入入口齐备',
 const importSrc = readFileSync(new URL('../src/pages/import/import.vue', import.meta.url), 'utf8');
 assert('补录页：明示照片不上传', importSrc.includes('照片本体绝不上传'));
 assert('补录页：单次最多 20 张', /count\s*[=:]\s*20/.test(importSrc));
+
+// 23. 1.1.0 视觉规范：深海蓝玻璃 + 香槟金
+const themeSrc = readFileSync(new URL('../src/styles/theme.scss', import.meta.url), 'utf8');
+assert('1.1.0 主题：玻璃面板 token（深蓝 88% + 描边）',
+  /rgba\(9,\s*30,\s*52,\s*0\.88\)/.test(themeSrc) && /rgba\(245,\s*240,\s*230,\s*0\.14\)/.test(themeSrc) &&
+  /backdrop-filter:\s*blur/.test(themeSrc));
+assert('1.1.0 主题：香槟金 #D9B36A 用于数字/选中/进度',
+  themeSrc.includes('#D9B36A') && /\.bar\s*>\s*view\s*\{[^}]*#D9B36A/.test(themeSrc.replace(/\n/g, ' ')));
+assert('1.1.0 主题：深海蓝微渐变 #0A1E34 → #0C2745',
+  themeSrc.includes('#0A1E34') && themeSrc.includes('#0C2745'));
+assert('1.1.0 主题：正文 #F2EDE3 / 次级 55% 米白',
+  themeSrc.includes('#F2EDE3') && /rgba\(242,\s*237,\s*227,\s*0\.55\)/.test(themeSrc));
+const pagesJson = JSON.parse(readFileSync(new URL('../src/pages.json', import.meta.url), 'utf8'));
+assert('1.1.0 tabBar：选中态香槟金、未选中次级色',
+  pagesJson.tabBar.selectedColor === '#D9B36A' && pagesJson.tabBar.color === '#7E93A8');
+// 地图标记铁律：省级气泡全部移除，全国视图只给已打卡城市
+assert('地图标记：省级进度气泡已全部移除', !mapSrc.includes('PROV_ABBR') && !mapSrc.includes('provAbbr'));
+assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）',
+  /this\.viewMode === 'nation'[\s\S]{0,220}CITIES\.filter\(c => !!v\[c\.name\]\)/.test(mapSrc) &&
+  !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
+assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
+const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
+assert('版本：1.1.0 / 110', manifestSrc.versionName === '1.1.0' && manifestSrc.versionCode === '110');
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

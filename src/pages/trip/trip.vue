@@ -157,13 +157,13 @@ export default {
         markers: this.cities.map((c, i) => ({
           id: i, latitude: c.lat, longitude: c.lng, width: 20, height: 20,
           iconPath: i === 0 ? '/static/icons/dot_green.png' : '/static/icons/dot_orange.png',
-          callout: { content: (i + 1) + '. ' + c.name, display: 'ALWAYS', fontSize: 10, bgColor: 'rgba(13,37,53,0.9)', color: '#F5F0E6', padding: 4, borderRadius: 6 }
+          callout: { content: (i + 1) + '. ' + c.name, display: 'ALWAYS', fontSize: 10, bgColor: 'rgba(9,30,52,0.94)', color: '#F2EDE3', borderWidth: 1, borderColor: 'rgba(217,179,106,0.45)', padding: 4, borderRadius: 6 }
         })),
         polyline: [{
           points: this.cities.map(c => { return { latitude: c.lat, longitude: c.lng }; }).concat(
             m.mode !== 'driving' && this.cities.length > 2 ? [{ latitude: this.cities[0].lat, longitude: this.cities[0].lng }] : []
           ),
-          color: '#E8A838', width: 4, dottedLine: m.mode !== 'driving'
+          color: '#D9B36A', width: 4, dottedLine: m.mode !== 'driving'
         }]
       };
       uni.hideLoading();
@@ -185,17 +185,40 @@ export default {
 </script>
 
 <style scoped>
-.trip-name { background: rgba(10,31,44,0.45); border: 1rpx solid rgba(245,240,230,0.14); border-radius: 12rpx; padding: 10rpx 18rpx; font-size: 24rpx; color: #F5F0E6; width: 300rpx; text-align: right; }
+.trip-name {
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.14);
+  border-radius: 999rpx; padding: 10rpx 22rpx;
+  font-size: 24rpx; color: #F2EDE3; width: 300rpx; text-align: right;
+}
 .city-line { margin-top: 16rpx; }
-.route-text { color: #E8A838; font-size: 26rpx; font-weight: 600; }
-.trip-rows { margin-top: 10rpx; }
-.trip-row { display: flex; align-items: center; gap: 18rpx; padding: 18rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
-.trip-row .ord { width: 44rpx; height: 44rpx; border-radius: 50%; background: rgba(245,240,230,0.08); color: #E8A838; display: flex; align-items: center; justify-content: center; font-size: 24rpx; flex: 0 0 44rpx; }
-.trip-row .name { flex: 1; font-size: 28rpx; color: #F5F0E6; }
+.route-text { color: #D9B36A; font-size: 26rpx; font-weight: 600; }
+.trip-rows { margin-top: 14rpx; }
+.trip-row {
+  display: flex; align-items: center; gap: 18rpx;
+  margin-bottom: 10rpx; padding: 18rpx 20rpx;
+  border-radius: 22rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+}
+.trip-row .ord {
+  width: 44rpx; height: 44rpx; border-radius: 50%;
+  background: rgba(217, 179, 106, 0.14);
+  border: 1rpx solid rgba(217, 179, 106, 0.38);
+  color: #D9B36A;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24rpx; flex: 0 0 44rpx;
+}
+.trip-row .name { flex: 1; font-size: 28rpx; color: #F2EDE3; }
 .ops { display: flex; gap: 10rpx; }
 .add-bar { margin-top: 20rpx; }
-.result-grid { display: flex; gap: 30rpx; margin-top: 16rpx; }
-.res { flex: 1; background: rgba(13,37,53,0.9); border-radius: 16rpx; padding: 20rpx; }
-.res-num { display: block; font-size: 44rpx; font-weight: 800; color: #E8A838; margin-bottom: 6rpx; }
-.trip-map { width: 100%; height: 440rpx; border-radius: 16rpx; margin-top: 20rpx; }
+.result-grid { display: flex; gap: 16rpx; margin-top: 16rpx; }
+.res {
+  flex: 1;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+  border-radius: 24rpx; padding: 22rpx;
+}
+.res-num { display: block; font-size: 46rpx; font-weight: 800; color: #D9B36A; margin-bottom: 6rpx; }
+.trip-map { width: 100%; height: 440rpx; border-radius: 24rpx; margin-top: 20rpx; }
 </style>

@@ -1,6 +1,7 @@
 /**
  * 生成地图标记 PNG 图标（纯 Node + zlib，无第三方依赖）
- * 输出到 src/static/icons/：绿（已打卡）/橙（想去）/灰（未去）/蓝（定位）
+ * 输出到 src/static/icons/：金（已打卡）/浅金（想去）/灰蓝（未去）/浅蓝（定位）/暖红
+ * 1.1.0：配色统一到香槟金体系（#D9B36A 为主）
  */
 import zlib from 'zlib';
 import fs from 'fs';
@@ -82,11 +83,11 @@ const outDir = path.resolve('src/static/icons');
 fs.mkdirSync(outDir, { recursive: true });
 
 const colors = {
-  'dot_green.png': [[34, 197, 94], 0.35],
-  'dot_orange.png': [[245, 158, 11], 0.35],
-  'dot_gray.png': [[148, 163, 178], 0.30],
-  'dot_blue.png': [[59, 130, 246], 0.35],
-  'dot_red.png': [[229, 69, 69], 0.35]
+  'dot_green.png': [[217, 179, 106], 0.45],
+  'dot_orange.png': [[231, 201, 140], 0.45],
+  'dot_gray.png': [[126, 147, 168], 0.30],
+  'dot_blue.png': [[169, 203, 228], 0.40],
+  'dot_red.png': [[214, 122, 110], 0.40]
 };
 
 for (const [file, [color, ra]] of Object.entries(colors)) {

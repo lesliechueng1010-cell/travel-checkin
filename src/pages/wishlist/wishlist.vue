@@ -87,7 +87,14 @@ export default {
 </script>
 
 <style scoped>
-.wish-row { display: flex; justify-content: space-between; align-items: center; padding: 22rpx 0; border-bottom: 1rpx solid rgba(245,240,230,0.08); }
-.wish-name { font-size: 30rpx; color: #F5F0E6; }
+.wish-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 12rpx; padding: 22rpx 22rpx;
+  border-radius: 24rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+}
+.wish-row:first-of-type { margin-top: 16rpx; }
+.wish-name { font-size: 30rpx; color: #F2EDE3; font-weight: 500; }
 .wish-actions { display: flex; gap: 12rpx; }
 </style>
