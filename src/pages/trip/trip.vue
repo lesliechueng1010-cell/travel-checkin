@@ -28,9 +28,7 @@
       </view>
 
       <view class="add-bar">
-        <picker mode="selector" :range="pickNames" @change="onPick">
-          <button class="btn ghost">＋ 添加城市（想去清单 / 全部城市）</button>
-        </picker>
+        <button class="btn ghost" @tap="openPicker">＋ 添加城市（想去清单 / 全部城市）</button>
       </view>
       <view class="add-bar" v-if="pendingCity" style="margin-top:14rpx">
         <button class="btn primary" @tap="addPending">把「{{ pendingCity }}」加入行程</button>
@@ -80,12 +78,58 @@
     </view>
 
     <view class="tiny" style="margin:0 24rpx 40rpx">天数估算规则：各城建议游玩天数之和 + 按每天驾驶约 500 km 估算的赶路天数。{{ DISCLAIMER }}</view>
+
+    <!-- 添加城市：搜索式底部弹层（1.3.0 替代系统滚轮选择器） -->
+    <view class="sheet-mask" v-if="pickerOpen" @tap="closePicker">
+      <view class="sheet" @tap.stop>
+        <view class="sheet-head">
+          <text class="sheet-title">添加城市</text>
+          <text class="sheet-close" @tap="closePicker">✕</text>
+        </view>
+        <input
+          class="sheet-search"
+          :value="pickKw"
+          placeholder="搜城市名或省份名，如：大理 / 云南"
+          confirm-type="search"
+          @input="onPickSearch"
+        />
+        <scroll-view scroll-y class="sheet-list">
+          <view v-if="pickKw.trim()">
+            <view v-if="!pickResults.length" class="empty">没找到这个城市</view>
+            <view class="pick-line" v-for="c in pickResults" :key="c.name" @tap="togglePick(c.name)">
+              <text class="pick-name">{{ c.name }}</text>
+              <text class="pick-prov">{{ c.prov }}</text>
+              <text class="pick-check" :class="{ on: !!draftSet[c.name] }">{{ draftSet[c.name] ? '✓' : '' }}</text>
+            </view>
+          </view>
+          <view v-else>
+            <view v-if="wishCities.length">
+              <view class="group-title">★ 想去</view>
+              <view class="pick-line" v-for="c in wishCities" :key="c.name" @tap="togglePick(c.name)">
+                <text class="pick-name">{{ c.name }}</text>
+                <text class="pick-prov">{{ c.prov }}</text>
+                <text class="pick-check" :class="{ on: !!draftSet[c.name] }">{{ draftSet[c.name] ? '✓' : '' }}</text>
+              </view>
+            </view>
+            <view v-for="p in provinces" :key="p">
+              <view class="group-title">{{ p }}</view>
+              <view class="pick-line" v-for="c in citiesOfProv(p)" :key="c.name" @tap="togglePick(c.name)">
+                <text class="pick-name">{{ c.name }}</text>
+                <text class="pick-prov">{{ c.prov }}</text>
+                <text class="pick-check" :class="{ on: !!draftSet[c.name] }">{{ draftSet[c.name] ? '✓' : '' }}</text>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+        <button class="btn primary sheet-done" @tap="confirmPicker">完成（{{ draftList.length }}）</button>
+      </view>
+    </view>
   </view>
 </template>
 
 <script>
 import store from '../../core/store.js';
-import { CITIES, findCity } from '../../data/cities.js';
+import { CITIES, findCity, searchCity, PROVINCES, citiesOfProv } from '../../data/cities.js';
 import { tripMileage, suggestDays, kmLabel } from '../../core/logic.js';
 import tmap from '../../utils/tmap.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
@@ -97,18 +141,28 @@ export default {
       cities: [],
       result: null,
       saved: [],
-      pickIndex: 0,
       pendingCity: '',
+      pickerOpen: false,
+      pickKw: '',
+      draftList: [],
+      wishCities: [],
+      provinces: PROVINCES,
       DISCLAIMER: SAFETY_DISCLAIMER
     };
   },
   computed: {
     cityNames() { return this.cities.map(c => c.name).join(' → ') + (this.cities.length > 2 ? ' → ' + this.cities[0].name + '（闭环）' : ''); },
-    pickNames() {
-      const s = store.get();
-      const wished = (s.wishlist || []).filter(n => !this.cities.find(c => c.name === n));
-      const rest = CITIES.map(c => c.name).filter(n => !this.cities.find(c => c.name === n) && !wished.includes(n));
-      return ['★ 想去：' + (wished.join(' / ') || '（空）')].concat(rest);
+    draftSet() {
+      const m = {};
+      this.draftList.forEach(n => { m[n] = true; });
+      return m;
+    },
+    pickResults() {
+      const kw = (this.pickKw || '').trim();
+      if (!kw) return [];
+      // 纯本地匹配：城市名 / 所属省份名；无结果再走别名（如「香格里拉」→ 迪庆）
+      const direct = CITIES.filter(c => c.name.includes(kw) || c.prov.includes(kw));
+      return direct.length ? direct : searchCity(kw);
     }
   },
   onShow() {
@@ -118,18 +172,26 @@ export default {
   },
   methods: {
     goDetail(name) { uni.navigateTo({ url: '/pages/city/detail?name=' + encodeURIComponent(name) }); },
-    onPick(e) {
-      const idx = Number(e.detail.value);
-      if (idx === 0) {
-        const wished = (store.get().wishlist || []).filter(n => !this.cities.find(c => c.name === n));
-        if (!wished.length) { uni.showToast({ title: '想去清单是空的', icon: 'none' }); return; }
-        this.cities.push(findCity(wished[0]));
-        return;
-      }
-      const name = this.pickNames[idx];
-      const c = findCity(name);
-      if (c) this.cities.push(c);
+    /* ---------- 添加城市弹层（搜索 + 分组浏览，切换式多选） ---------- */
+    openPicker() {
+      this.draftList = this.cities.map(c => c.name);
+      this.pickKw = '';
+      this.wishCities = (store.get().wishlist || []).map(n => findCity(n)).filter(Boolean);
+      this.pickerOpen = true;
     },
+    closePicker() { this.pickerOpen = false; },
+    onPickSearch(e) { this.pickKw = e.detail.value || ''; },
+    togglePick(name) {
+      const i = this.draftList.indexOf(name);
+      if (i >= 0) this.draftList.splice(i, 1);
+      else this.draftList.push(name);
+    },
+    confirmPicker() {
+      this.cities = this.draftList.map(n => findCity(n)).filter(Boolean);
+      this.result = null;
+      this.pickerOpen = false;
+    },
+    citiesOfProv(p) { return citiesOfProv(p); },
     addPending() {
       const c = findCity(this.pendingCity);
       if (c && !this.cities.find(x => x.name === c.name)) this.cities.push(c);
@@ -221,4 +283,47 @@ export default {
 }
 .res-num { display: block; font-size: 46rpx; font-weight: 800; color: #D9B36A; margin-bottom: 6rpx; }
 .trip-map { width: 100%; height: 440rpx; border-radius: 24rpx; margin-top: 20rpx; }
+
+/* 添加城市弹层：深海蓝玻璃，与 1.1.0 视觉语言一致 */
+.sheet-mask {
+  position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 50;
+  background: rgba(4, 15, 28, 0.62);
+}
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  max-height: 78vh; display: flex; flex-direction: column;
+  background: rgba(9, 30, 52, 0.98);
+  border-radius: 32rpx 32rpx 0 0;
+  border-top: 1rpx solid rgba(245, 240, 230, 0.16);
+  padding: 28rpx 28rpx 36rpx;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20rpx; }
+.sheet-title { font-size: 32rpx; font-weight: 700; color: #F2EDE3; }
+.sheet-close { font-size: 30rpx; color: rgba(242, 237, 227, 0.6); padding: 6rpx 10rpx; }
+.sheet-search {
+  background: rgba(245, 240, 230, 0.06);
+  border: 1rpx solid rgba(245, 240, 230, 0.16);
+  border-radius: 999rpx; padding: 18rpx 28rpx;
+  font-size: 27rpx; color: #F2EDE3;
+}
+.sheet-list { flex: 1 1 auto; min-height: 200rpx; margin-top: 18rpx; }
+.group-title {
+  font-size: 24rpx; font-weight: 600; color: #D9B36A;
+  margin: 22rpx 6rpx 10rpx;
+}
+.pick-line {
+  display: flex; align-items: center; gap: 16rpx;
+  padding: 20rpx 22rpx; margin-bottom: 10rpx;
+  border-radius: 20rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.09);
+}
+.pick-name { font-size: 28rpx; color: #F2EDE3; }
+.pick-prov { flex: 1; font-size: 23rpx; color: rgba(242, 237, 227, 0.5); }
+.pick-check {
+  width: 40rpx; text-align: center;
+  font-size: 30rpx; font-weight: 700; color: rgba(242, 237, 227, 0.25);
+}
+.pick-check.on { color: #D9B36A; }
+.sheet-done { margin-top: 20rpx; }
 </style>

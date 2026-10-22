@@ -21,7 +21,7 @@ const store = (await import('../src/core/store.js')).default;
 const logic = await import('../src/core/logic.js');
 const cache = (await import('../src/utils/cache.js')).default;
 const guides = await import('../src/data/guides.js.js'.replace(/\.js\.js/, '.js'));
-const { CITIES, findCity } = await import('../src/data/cities.js');
+const { CITIES, findCity, searchCity } = await import('../src/data/cities.js');
 
 // 1. boot（本地模式，无云）
 await store.boot();
@@ -487,6 +487,7 @@ assert('我的页：已移除「各省进度」整卡', !mySrc.includes('各省�
 assert('我的页：最近足迹 / 成就徽章 / 导入入口齐备',
   mySrc.includes('最近足迹') && mySrc.includes('成就徽章') && mySrc.includes('导入历史足迹'));
 const importSrc = readFileSync(new URL('../src/pages/import/import.vue', import.meta.url), 'utf8');
+const tripSrc = readFileSync(new URL('../src/pages/trip/trip.vue', import.meta.url), 'utf8');
 assert('补录页：明示照片不上传', importSrc.includes('照片本体绝不上传'));
 assert('补录页：单次最多 20 张', /count\s*[=:]\s*20/.test(importSrc));
 
@@ -511,7 +512,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.2.2 / 122', manifestSrc.versionName === '1.2.2' && manifestSrc.versionCode === '122');
+assert('版本：1.3.0 / 130', manifestSrc.versionName === '1.3.0' && manifestSrc.versionCode === '130');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -644,5 +645,24 @@ assert('1.2.1 省行：胶囊圆角/填充/金针/进度条未改',
   /width:\s*30rpx/.test(provPinCss) && /margin-right:\s*150rpx/.test(barCss111));
 assert('1.2.1 城市行：补同样的左右边距，列表观感不变',
   /margin-left:\s*24rpx/.test(cityRowCss) && /margin-right:\s*24rpx/.test(cityRowCss));
+
+// 27. 1.3.0 行程页：添加城市改搜索式弹层（替代系统滚轮选择器）
+assert('1.3.0 行程页：系统滚轮选择器已移除', !/<picker\s/.test(tripSrc) && !/pickNames/.test(tripSrc));
+assert('1.3.0 行程页：深色玻璃底部弹层 + 搜索框已上线',
+  /sheet-mask/.test(tripSrc) && /sheet-search/.test(tripSrc) && /rgba\(9,\s*30,\s*52/.test(tripSrc));
+assert('1.3.0 行程页：无输入时先列想去、再按省份分组',
+  tripSrc.includes('★ 想去') && /citiesOfProv\(p\)/.test(tripSrc) && /wishCities/.test(tripSrc));
+assert('1.3.0 行程页：点选为切换式，底部有完成（N）按钮',
+  /togglePick\(c\.name\)/.test(tripSrc) && /draftList\.indexOf\(name\)/.test(tripSrc) &&
+  tripSrc.includes('完成（{{ draftList.length }}）'));
+assert('1.3.0 行程页：确认后按 draft 顺序落位且旧计算结果作废',
+  /this\.cities = this\.draftList\.map/.test(tripSrc) && /this\.result = null/.test(tripSrc));
+assert('1.3.0 搜索过滤：省份名能命中城市（云南 → 大理）',
+  CITIES.filter(c => c.name.includes('云南') || c.prov.includes('云南')).some(c => c.name === '大理白族自治州'));
+assert('1.3.0 搜索过滤：城市名关键词直达（喀什）',
+  CITIES.filter(c => c.name.includes('喀什') || c.prov.includes('喀什')).length >= 1);
+assert('1.3.0 搜索过滤：无直达时别名兜底（香格里拉 → 迪庆）',
+  searchCity('香格里拉').length === 1 && searchCity('香格里拉')[0].prov === '云南省');
+assert('1.3.0 行程页：里程/天数计算入口未动', /tripMileage/.test(tripSrc) && /suggestDays/.test(tripSrc));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
