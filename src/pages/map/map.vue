@@ -64,9 +64,10 @@
             <view class="prov-head">
               <view class="prov-pin"></view>
               <text class="prov-name">{{ p.prov }}</text>
-              <text class="prov-count">{{ p.visited }}/{{ p.total }}</text>
-              <text class="prov-arrow">›</text>
             </view>
+            <!-- 计数与箭头直接挂在 .prov-row 下：定位基准是整行，垂直居中对齐胶囊中心 -->
+            <text class="prov-count">{{ p.visited }}/{{ p.total }}</text>
+            <text class="prov-arrow">›</text>
             <view class="bar"><view :style="{ width: p.pct + '%' }"></view></view>
           </view>
         </view>
@@ -392,15 +393,19 @@ export default {
   overflow: hidden; overflow-x: hidden;
   transition: max-height .28s ease, opacity .22s ease;
 }
-.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 24rpx 32rpx; overflow-x: hidden; }
+.sheet-body.show { max-height: 32vh; opacity: 1; padding: 0 0 32rpx; overflow-x: hidden; }
 
 /* 省份行 · 全胶囊玻璃卡（行距 12rpx）
    布局沿用 1.0.4 的绝对定位：计数 position:absolute 钉右，脱离文档流、宽度固定，
    任何屏宽都不会被挤出屏幕；省名给计数与行尾箭头预留固定空间，超出单行省略。
-   1.1.1：胶囊形（999rpx）+ 提亮填充 + 悬浮阴影，省名前加金色定位针。 */
+   1.1.1：胶囊形（999rpx）+ 提亮填充 + 悬浮阴影，省名前加金色定位针。
+   1.2.1：左右边距改由行自身控制（.sheet-body 不再给横向 padding），保证真机左右严格对称；
+          计数/箭头改挂在 .prov-row 下，以整行高度垂直居中。 */
 .prov-row {
   position: relative;
   padding: 24rpx 36rpx;
+  margin-left: 24rpx;
+  margin-right: 24rpx;
   margin-bottom: 12rpx;
   border-radius: 999rpx;
   background: rgba(150, 180, 215, 0.16);
@@ -429,14 +434,16 @@ export default {
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-size: 27rpx; color: #F2EDE3; font-weight: 500;
 }
+/* 计数 / 箭头：定位基准是 .prov-row（整行），top 50% 垂直居中到胶囊中心。
+   right 值含 36rpx 行内右 padding，视觉位置与 1.1.1 完全一致（40 / 0 相对内容区）。 */
 .prov-count {
-  position: absolute; right: 40rpx; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 76rpx; top: 50%; transform: translateY(-50%);
   width: 110rpx; text-align: right; white-space: nowrap;
   font-size: 22rpx; color: #FFFFFF; font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .prov-arrow {
-  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 36rpx; top: 50%; transform: translateY(-50%);
   font-size: 26rpx; color: #FFFFFF; line-height: 1;
 }
 /* 进度条留在胶囊内下部，右端与计数列左缘对齐（36 padding + 40 + 110 = 186rpx，故 150rpx） */
@@ -446,6 +453,9 @@ export default {
 .city-row {
   position: relative;
   padding: 22rpx 22rpx;
+  /* .sheet-body 已去掉横向 padding，这里补同样的左右边距，城市列表观感与之前一致 */
+  margin-left: 24rpx;
+  margin-right: 24rpx;
   margin-bottom: 10rpx;
   border-radius: 22rpx;
   background: rgba(245, 240, 230, 0.045);

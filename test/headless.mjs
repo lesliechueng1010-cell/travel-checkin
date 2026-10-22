@@ -511,7 +511,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.2.0 / 120', manifestSrc.versionName === '1.2.0' && manifestSrc.versionCode === '120');
+assert('版本：1.2.1 / 121', manifestSrc.versionName === '1.2.1' && manifestSrc.versionCode === '121');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -611,5 +611,31 @@ assert('补录页：HEIC 原图已改为支持（不再标为跳过）', importS
 assert('补录页：轨迹文件零命中计入跳过并给出原因',
   /skipFileNoPoints/.test(importSrc) && /skipFileNoCity/.test(importSrc) && /skipFileRead/.test(importSrc));
 assert('补录页：解析结果统一走 importFootprints', /store\.importFootprints\(/.test(importSrc));
+
+// 26. 1.2.1 定点修：省份行计数/箭头以整行为基准垂直居中 + 左右边距由行自身控制
+const provRowCss121 = block('.prov-row');
+const provCountCss121 = block('.prov-count');
+const provArrowCss121 = block('.prov-arrow');
+const sheetBodyShowCss = block('.sheet-body.show');
+const headClose = mapSrc.indexOf('</view>', mapSrc.indexOf('class="prov-name"'));
+assert('1.2.1 省行：左右边距改由行自身控制（各 24rpx）',
+  /margin-left:\s*24rpx/.test(provRowCss121) && /margin-right:\s*24rpx/.test(provRowCss121));
+assert('1.2.1 抽屉：.sheet-body 横向 padding 已去掉',
+  /padding:\s*0\s+0\s+32rpx/.test(sheetBodyShowCss) && !/24rpx/.test(sheetBodyShowCss));
+assert('1.2.1 省行：计数/箭头不再嵌在 .prov-head 内（定位基准改为整行）',
+  headClose > 0 && mapSrc.indexOf('class="prov-count"') > headClose && mapSrc.indexOf('class="prov-arrow"') > headClose,
+  `headClose=${headClose}`);
+assert('1.2.1 省行：计数/箭头以整行 50% 垂直居中',
+  /top:\s*50%/.test(provCountCss121) && /translateY\(-50%\)/.test(provCountCss121) &&
+  /top:\s*50%/.test(provArrowCss121) && /translateY\(-50%\)/.test(provArrowCss121));
+assert('1.2.1 省行：右偏移补上 36rpx 行内 padding，视觉位置与 1.1.1 一致',
+  /right:\s*76rpx/.test(provCountCss121) && /right:\s*36rpx/.test(provArrowCss121) &&
+  (36 + 40) === 76);
+assert('1.2.1 省行：胶囊圆角/填充/金针/进度条未改',
+  /border-radius:\s*999rpx/.test(provRowCss121) &&
+  /rgba\(150,\s*180,\s*215,\s*0\.16\)/.test(provRowCss121) &&
+  /width:\s*30rpx/.test(provPinCss) && /margin-right:\s*150rpx/.test(barCss111));
+assert('1.2.1 城市行：补同样的左右边距，列表观感不变',
+  /margin-left:\s*24rpx/.test(cityRowCss) && /margin-right:\s*24rpx/.test(cityRowCss));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
