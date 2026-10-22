@@ -1,0 +1,9 @@
+node_modules/
+dist/
+unpackage/
+.hbuilderx/
+.npm-tmp-cache/
+.DS_Store
+*.local
+.env*
+!.env.example

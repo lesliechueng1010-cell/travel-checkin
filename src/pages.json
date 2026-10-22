@@ -1,0 +1,30 @@
+{
+  "pages": [
+    { "path": "pages/map/map", "style": { "navigationStyle": "custom", "backgroundColor": "#0B0F14" } },
+    { "path": "pages/wishlist/wishlist", "style": { "navigationBarTitleText": "想去清单", "backgroundColor": "#0B0F14" } },
+    { "path": "pages/trip/trip", "style": { "navigationBarTitleText": "串线行程", "backgroundColor": "#0B0F14" } },
+    { "path": "pages/my/my", "style": { "navigationBarTitleText": "我的足迹", "backgroundColor": "#0B0F14" } },
+    { "path": "pages/city/detail", "style": { "navigationBarTitleText": "城市详情", "backgroundColor": "#0B0F14" } },
+    { "path": "pages/poster/poster", "style": { "navigationBarTitleText": "足迹海报", "backgroundColor": "#0B0F14" } },
+    { "path": "pages/safety/safety", "style": { "navigationBarTitleText": "安全角", "backgroundColor": "#0B0F14" } }
+  ],
+  "tabBar": {
+    "color": "#7A828E",
+    "selectedColor": "#22C55E",
+    "backgroundColor": "#10161F",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/map/map", "text": "足迹地图" },
+      { "pagePath": "pages/wishlist/wishlist", "text": "想去" },
+      { "pagePath": "pages/trip/trip", "text": "行程" },
+      { "pagePath": "pages/my/my", "text": "我的" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#10161F",
+    "backgroundColor": "#0B0F14",
+    "app-plus": { "background": "#0B0F14" }
+  },
+  "lazyCodeLoading": "requiredComponents"
+}

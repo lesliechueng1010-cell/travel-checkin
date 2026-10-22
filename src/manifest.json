@@ -1,0 +1,25 @@
+{
+  "name": "旅行足迹打卡",
+  "appid": "",
+  "description": "全国地图城市打卡 · 攻略 · 串线行程",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "vueVersion": "3",
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "requiredPrivateInfos": ["getLocation"],
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于定位所在城市提示打卡、推荐最近的未去城市与导航"
+      }
+    }
+  },
+  "mp-alipay": { "usingComponents": true },
+  "h5": { "title": "旅行足迹打卡" }
+}

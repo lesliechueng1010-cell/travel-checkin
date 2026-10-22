@@ -1,0 +1,93 @@
+/* ===== 旅行足迹打卡 · 深色主题全局样式 ===== */
+page {
+  background: #0B0F14;
+  color: #E8EDF2;
+  font-size: 28rpx;
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+}
+view, text, button, input, textarea { box-sizing: border-box; }
+
+.page { min-height: 100vh; background: #0B0F14; padding-bottom: 40rpx; }
+.pad { padding: 24rpx; }
+
+/* 卡片 */
+.card {
+  background: #151B24;
+  border: 1rpx solid #232D3B;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin: 20rpx 24rpx;
+}
+.card-soft { background: #10161F; border-radius: 20rpx; padding: 24rpx; }
+
+/* 标题 */
+.h1 { font-size: 44rpx; font-weight: 700; color: #E8EDF2; }
+.h2 { font-size: 34rpx; font-weight: 700; color: #E8EDF2; }
+.h3 { font-size: 30rpx; font-weight: 600; color: #E8EDF2; }
+.sub { font-size: 24rpx; color: #A8B3BF; }
+.tiny { font-size: 22rpx; color: #6B7684; }
+.brand-text { color: #22C55E; }
+
+/* 徽标 */
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 4rpx 16rpx; border-radius: 999rpx;
+  font-size: 22rpx; background: #1A2230; color: #A8B3BF;
+  margin-right: 12rpx;
+}
+.chip.green { background: rgba(34,197,94,.15); color: #22C55E; }
+.chip.orange { background: rgba(245,158,11,.15); color: #F59E0B; }
+.chip.red { background: rgba(229,69,69,.15); color: #E54545; }
+.chip.blue { background: rgba(59,130,246,.15); color: #3B82F6; }
+
+/* 按钮 */
+.btn {
+  display: flex; align-items: center; justify-content: center;
+  height: 84rpx; border-radius: 20rpx; font-size: 30rpx;
+  background: #1A2230; color: #E8EDF2; border: none;
+}
+.btn::after { border: none; }
+.btn.primary { background: #22C55E; color: #07130B; font-weight: 700; }
+.btn.ghost { background: transparent; border: 1rpx solid #2C3948; color: #E8EDF2; }
+.btn.warn { background: rgba(245,158,11,.15); color: #F59E0B; }
+.btn.danger { background: rgba(229,69,69,.15); color: #E54545; }
+.btn.disabled { opacity: .45; }
+.btn.sm { height: 60rpx; font-size: 24rpx; border-radius: 14rpx; padding: 0 24rpx; }
+
+/* 进度条 */
+.bar { height: 12rpx; border-radius: 999rpx; background: #232D3B; overflow: hidden; }
+.bar > view { height: 100%; border-radius: 999rpx; background: linear-gradient(90deg, #16A34A, #22C55E); }
+
+/* 列表行 */
+.row { display: flex; align-items: center; justify-content: space-between; }
+.row-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 26rpx 0; border-bottom: 1rpx solid #1B2432;
+}
+.row-item:last-child { border-bottom: none; }
+
+/* 分隔 */
+.divider { height: 1rpx; background: #1B2432; margin: 20rpx 0; }
+
+/* 输入 */
+.input, .textarea {
+  background: #0E141D; border: 1rpx solid #232D3B; border-radius: 16rpx;
+  padding: 20rpx; color: #E8EDF2; font-size: 26rpx; width: 100%;
+}
+
+/* 空态 */
+.empty { text-align: center; padding: 80rpx 0; color: #6B7684; font-size: 26rpx; }
+
+/* 醒目警示块（危险注意事项专用） */
+.danger-block {
+  background: rgba(229,69,69,.10);
+  border: 2rpx solid rgba(229,69,69,.45);
+  border-radius: 20rpx; padding: 24rpx; margin: 20rpx 0;
+}
+.danger-block .dt { color: #E54545; font-weight: 700; font-size: 28rpx; margin-bottom: 12rpx; }
+
+/* 通用提示条 */
+.notice {
+  background: rgba(59,130,246,.10); border: 1rpx solid rgba(59,130,246,.35);
+  border-radius: 16rpx; padding: 18rpx; color: #A8B3BF; font-size: 22rpx;
+}
