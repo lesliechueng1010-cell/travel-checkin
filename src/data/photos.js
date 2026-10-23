@@ -32,7 +32,7 @@ export const CITY_PHOTOS = {
   '长沙': { slug: 'changsha', scene: '橘子洲头', credit: '摄影：Li Ming (sculptor) · CC BY 3.0 · Wikimedia Commons' },
   '南京': { slug: 'nanjing', scene: '紫峰大厦夜景', credit: '摄影：董辰兴 · CC BY-SA 4.0 · Wikimedia Commons' },
   '杭州': { slug: 'hangzhou', scene: '西湖', credit: '摄影：Louisa Salazar · CC BY-SA 3.0 · Wikimedia Commons' },
-  '苏州': { slug: 'suzhou', scene: '东方之门夜景', credit: '摄影：蔡小贫 · CC BY-SA 4.0 · Wikimedia Commons' },
+  '苏州': { slug: 'suzhou', scene: '金鸡湖东方之门', credit: '用户供图' },
   '厦门': { slug: 'xiamen', scene: '双子塔黄昏', credit: '摄影：周流劲火 · CC BY 2.5 · Wikimedia Commons' },
   '广州': { slug: 'guangzhou', scene: '广州塔夜景', credit: '摄影：Tim Wu · CC BY-SA 4.0 · Wikimedia Commons' },
   '武汉': { slug: 'wuhan', scene: '黄鹤楼', credit: '摄影：xiquinhosilva · CC BY 2.0 · Wikimedia Commons' },
