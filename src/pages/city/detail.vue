@@ -181,7 +181,7 @@ import { findCity } from '../../data/cities.js';
 import { getGuideData } from '../../data/guides.js';
 import { haversine, kmLabel } from '../../core/logic.js';
 import { openNavMenu } from '../../utils/nav.js';
-import tmap from '../../utils/tmap.js';
+import tmap, { mergeRoutePoints } from '../../utils/tmap.js';
 import cache from '../../utils/cache.js';
 import api from '../../api/index.js';
 import { PHOTO_BASE, PHOTO_EXT, CITY_PHOTOS } from '../../data/photos.js';
@@ -189,23 +189,8 @@ import { SAFETY_DISCLAIMER } from '../../config.js';
 
 /**
  * 多段道路线拼接为一条 polyline
- * 路段之间首尾重合的衔接点只保留一个（差值 < 1e-5°≈1m 视为同一点）
+ * 1.6.0：实现已提到 utils/tmap.js 的 mergeRoutePoints（行程页共用），此处仅引用，行为不变
  */
-function mergeSegPoints(segs) {
-  const out = [];
-  segs.forEach(s => {
-    (s.points || []).forEach((p, i) => {
-      const pt = { latitude: p.lat, longitude: p.lng };
-      if (i === 0 && out.length) {
-        const last = out[out.length - 1];
-        if (Math.abs(last.latitude - pt.latitude) < 1e-5 &&
-            Math.abs(last.longitude - pt.longitude) < 1e-5) return;
-      }
-      out.push(pt);
-    });
-  });
-  return out;
-}
 
 export default {
   data() {
@@ -375,7 +360,7 @@ export default {
         // 各段真实里程求和；各段坐标串首尾衔接，去掉重复的衔接点
         km = segs.reduce((s, r) => s + r.km, 0);
         mode = roadMode;
-        line = mergeSegPoints(segs);
+        line = mergeRoutePoints(segs.map(s => s.points));
       } else {
         for (let i = 0; i < pts.length - 1; i++) km += haversine(pts[i], pts[i + 1]);
         line = pts.map(p => ({ latitude: p.lat, longitude: p.lng }));

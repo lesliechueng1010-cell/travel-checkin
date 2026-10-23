@@ -63,7 +63,14 @@ assert('打卡自动清想去', !store.get().wishlist.includes('大理白族自�
 // 7. 串线行程（无 Key → 直线估算，明确标注）
 const tripCities = ['成都', '丽江', '拉萨'].map(n => findCity(n));
 const m = await logic.tripMileage(tripCities, null);
-assert('行程里程为直线估算', m.mode === 'straight' && m.km > 300 && m.km < 2000, m.km);
+// 1.6.0 起直线兜底也含「末城→首城」闭合段，期望值按同口径现算，不写死数字
+const tripStraightKm = Math.round(
+  logic.haversine(tripCities[0], tripCities[1]) +
+  logic.haversine(tripCities[1], tripCities[2]) +
+  logic.haversine(tripCities[2], tripCities[0])
+);
+assert('行程里程为直线估算（1.6.0 起含回程闭合段）',
+  m.mode === 'straight' && m.km === tripStraightKm && m.legs.length === 3, m.km);
 const days = logic.suggestDays(tripCities, m.km);
 assert('建议天数 = 城市天数+赶路天数', days.total === days.cityDays + days.driveDays && days.cityDays >= 3);
 store.saveTrip({ id: 'T1', name: '川滇藏', cities: ['成都', '丽江', '拉萨'] });
@@ -519,7 +526,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.5.3 / 153', manifestSrc.versionName === '1.5.3' && manifestSrc.versionCode === '153');
+assert('版本：1.6.0 / 160', manifestSrc.versionName === '1.6.0' && manifestSrc.versionCode === '160');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -1159,9 +1166,12 @@ assert('1.5.2 A：previewRoute 逐段规划，全部成功才采用道路线（�
   !/if \(r\) \{ km \+= r\.km; mode = 'driving'; \}/.test(detailSrc) &&
   /kmLabel\(mode\)/.test(detailSrc));
 assert('1.5.2 A：实线/虚线按 mode 切换 + 衔接点去重后单条 polyline',
-  /function mergeSegPoints\(/.test(detailSrc) &&
   /points: line,/.test(detailSrc) &&
   /dottedLine: mode === 'straight'/.test(detailSrc));
+assert('1.6.0：详情页改用公共 mergeRoutePoints（本地副本已删，行为不变）',
+  /import tmap, \{ mergeRoutePoints \} from '\.\.\/\.\.\/utils\/tmap\.js'/.test(detailSrc152) &&
+  /line = mergeRoutePoints\(segs\.map\(s => s\.points\)\)/.test(detailSrc152) &&
+  !/function mergeSegPoints\(/.test(detailSrc152));
 
 /* ===== 39. 1.5.2 B：全量坐标基线（guides.js 逐点比对 + 相邻段核验） ===== */
 const baseline = JSON.parse(readFileSync(new URL('../test/geocode-baseline.json', import.meta.url), 'utf8'));
@@ -1234,5 +1244,116 @@ assert('1.5.2 B：核正脚本走 place/v1/search，Key 只从 config.js 读、�
   !/tmapKey\s*[:=]\s*['"][^'"]+['"]/.test(auditSrc));
 assert('1.5.2 B：遇配额类致命状态立即停（121/110/111/112/199 白名单 + 不重试）',
   /FATAL_STATUS/.test(auditSrc) && auditSrc.includes('121') && auditSrc.includes('process.exit(3)'));
+
+/* ===== 40. 1.6.0：行程环线全有全无 + 闭合段 + 分段导航 ===== */
+const trip3 = ['成都', '丽江', '拉萨'].map(n => findCity(n));
+const segPts = k => [{ lat: 30 + k * 0.01, lng: 100 + k * 0.01 }, { lat: 31 + k * 0.01, lng: 101 + k * 0.01 }];
+const pairKm = (a, b) => Math.round(logic.haversine(a, b));
+const straight3 = pairKm(trip3[0], trip3[1]) + pairKm(trip3[1], trip3[2]) + pairKm(trip3[2], trip3[0]);
+
+// 40.1 三段全部成功 → 道路里程求和、实线、legs 带 points
+let okIdx = 0;
+const mRoad = await logic.tripMileage(trip3, async () => { okIdx++; return { km: 100 * okIdx, points: segPts(okIdx) }; });
+assert('1.6.0 tripMileage：三城全成功 → km = 三段道路里程之和（含闭合段）',
+  mRoad.mode === 'driving' && mRoad.km === 600 && okIdx === 3, `${mRoad.mode} km=${mRoad.km} calls=${okIdx}`);
+assert('1.6.0 tripMileage：legs 长度 3，闭合段为末城→首城且每段带 points',
+  mRoad.legs.length === 3 &&
+  mRoad.legs[2].from === '拉萨' && mRoad.legs[2].to === '成都' &&
+  mRoad.legs.every(l => Array.isArray(l.points) && l.points.length === 2),
+  mRoad.legs.map(l => `${l.from}→${l.to}`).join(','));
+assert('1.6.0 tripMileage：straightKm 仍为纯直线总和（含闭合段）',
+  mRoad.straightKm === straight3, `${mRoad.straightKm} vs ${straight3}`);
+
+// 40.2 任一段失败 → 整体回退直线，绝不混算
+let badIdx = 0;
+const mFallback = await logic.tripMileage(trip3, async () => {
+  badIdx++;
+  return badIdx === 3 ? null : { km: 100, points: segPts(badIdx) };
+});
+assert('1.6.0 tripMileage：一段失败 → mode straight、km = 三段 haversine 之和（含闭合）',
+  mFallback.mode === 'straight' && mFallback.km === straight3 && badIdx === 3,
+  `${mFallback.mode} km=${mFallback.km}`);
+assert('1.6.0 tripMileage：回退时 legs 无 points（不留半真半假的实线）',
+  mFallback.legs.length === 3 && mFallback.legs.every(l => l.points === undefined) &&
+  mFallback.legs[0].km === pairKm(trip3[0], trip3[1]));
+assert('1.6.0 tripMileage：不混算（失败时公里数不是「两段道路 + 一段直线」）',
+  mFallback.km !== 200 && mFallback.km === mFallback.straightKm);
+
+// 40.3 两城不加闭合段
+const trip2 = ['成都', '重庆'].map(n => findCity(n));
+const mTwo = await logic.tripMileage(trip2, async () => ({ km: 320.4, points: segPts(1) }));
+assert('1.6.0 tripMileage：两城不加闭合段（legs 长度 1）',
+  mTwo.mode === 'driving' && mTwo.legs.length === 1 && mTwo.km === 320 && mTwo.legs[0].to === '重庆',
+  `legs=${mTwo.legs.length} km=${mTwo.km}`);
+const mTwoStraight = await logic.tripMileage(trip2, null);
+assert('1.6.0 tripMileage：两城直线兜底也不加闭合段',
+  mTwoStraight.mode === 'straight' && mTwoStraight.legs.length === 1 &&
+  mTwoStraight.km === pairKm(trip2[0], trip2[1]));
+
+// 40.4 契约细节：无 calc / 抛错 / 缺 points / 空点数组 一律整条回退
+assert('1.6.0 tripMileage：无 calc 时整条直线（legs 只含 km）',
+  (await logic.tripMileage(trip3, null)).mode === 'straight');
+assert('1.6.0 tripMileage：calc 抛错视为该段失败',
+  (await logic.tripMileage(trip3, async () => { throw new Error('quota'); })).mode === 'straight');
+assert('1.6.0 tripMileage：calc 返回缺 points / 空 points 视为失败（不允许无点实线）',
+  (await logic.tripMileage(trip3, async () => ({ km: 100 }))).mode === 'straight' &&
+  (await logic.tripMileage(trip3, async () => ({ km: 100, points: [] }))).mode === 'straight');
+assert('1.6.0 tripMileage：城市数 < 2 返回空结果（不抛错）',
+  (await logic.tripMileage([trip3[0]], null)).legs.length === 0 &&
+  (await logic.tripMileage([], null)).km === 0);
+
+// 40.5 mergeRoutePoints：衔接点去重
+const merged = tmap.mergeRoutePoints([
+  [{ lat: 30, lng: 100 }, { lat: 30.5, lng: 100.5 }],
+  [{ lat: 30.5, lng: 100.5 }, { lat: 31, lng: 101 }]
+]);
+assert('1.6.0 mergeRoutePoints：首尾重合的衔接点只留一个（4 点 → 3 点）',
+  merged.length === 3 &&
+  merged[0].latitude === 30 && merged[0].longitude === 100 &&
+  merged[1].latitude === 30.5 && merged[2].latitude === 31,
+  JSON.stringify(merged));
+assert('1.6.0 mergeRoutePoints：1e-5° 内视为同一点，明显不同则都保留',
+  tmap.mergeRoutePoints([
+    [{ lat: 30, lng: 100 }, { lat: 30.5, lng: 100.5 }],
+    [{ lat: 30.500004, lng: 100.500004 }, { lat: 31, lng: 101 }]
+  ]).length === 3 &&
+  tmap.mergeRoutePoints([
+    [{ lat: 30, lng: 100 }],
+    [{ lat: 30.002, lng: 100.002 }]
+  ]).length === 2);
+assert('1.6.0 mergeRoutePoints：输出微信 map 点格式，非法输入不崩',
+  merged.every(p => typeof p.latitude === 'number' && typeof p.longitude === 'number' && p.lat === undefined) &&
+  tmap.mergeRoutePoints(null).length === 0 && tmap.mergeRoutePoints([]).length === 0 &&
+  tmap.mergeRoutePoints([[null, { lat: NaN, lng: 1 }]]).length === 0);
+
+// 40.6 行程页源码：地图 id / 一屏框全 / 分段导航 / 契约接线
+const tripSrc160 = readFileSync(new URL('../src/pages/trip/trip.vue', import.meta.url), 'utf8');
+assert('1.6.0 行程页：地图挂 id="tripMap" 并用 includePoints 一屏框全整条环线',
+  /id="tripMap"/.test(tripSrc160) &&
+  /createMapContext\('tripMap', this\)\.includePoints\(\{ points: pts, padding: \[48, 48, 48, 48\] \}\)/.test(tripSrc160));
+assert('1.6.0 行程页：calc 走 tmap.planRoute 取 { km, points }',
+  /tmap\.planRoute\(\{ lat: a\.lat, lng: a\.lng \}, \{ lat: b\.lat, lng: b\.lng \}, 'driving'\)/.test(tripSrc160) &&
+  /tmap\.hasKey\(\)/.test(tripSrc160));
+assert('1.6.0 行程页：driving 用 mergeRoutePoints 实线，straight 才画城市点 + 闭合虚线',
+  /mergeRoutePoints\(m\.legs\.map\(l => l\.points\)\)/.test(tripSrc160) &&
+  /dottedLine: !onRoad/.test(tripSrc160) &&
+  /this\.cities\.length >= 3 \? \[\{ latitude: this\.cities\[0\]\.lat, longitude: this\.cities\[0\]\.lng \}\]/.test(tripSrc160));
+assert('1.6.0 行程页：结果卡含「分段导航」列表与每段「导航」按钮',
+  tripSrc160.includes('分段导航') && /@tap="navLeg\(l\)"/.test(tripSrc160) &&
+  /l\.from \}\} → \{\{ l\.to \}\} · \{\{ l\.km \}\} km|\{\{ l\.from \}\} → \{\{ l\.to \}\}/.test(tripSrc160) &&
+  /\{\{ l\.km \}\} km/.test(tripSrc160));
+assert('1.6.0 行程页：导航按钮走 nav.js 的 openNavMenu（与详情页同款）',
+  /import \{ openNavMenu \} from '\.\.\/\.\.\/utils\/nav\.js'/.test(tripSrc160) &&
+  /navLeg\(leg\) \{[\s\S]{0,120}openNavMenu\(c\)/.test(tripSrc160));
+assert('1.6.0 行程页：闭合段标注「（回到起点）」且只在末段置 closed',
+  tripSrc160.includes('（回到起点）') &&
+  /closed: this\.cities\.length >= 3 && i === m\.legs\.length - 1 && l\.to === this\.cities\[0\]\.name/.test(tripSrc160));
+assert('1.6.0 行程页：legs 只回填展示字段（points 不进 result/setData）',
+  /legs: m\.legs\.map\(\(l, i\) => \(\{/.test(tripSrc160) &&
+  !/legs: m\.legs\b(?!\.map)/.test(tripSrc160) && !/legs: m\.legs\.map\(\(l, i\) => \(\{ \.\.\.l/.test(tripSrc160));
+assert('1.6.0 行程页：天数继续吃总 km（自动含回程）、存档结构与环线模板未动',
+  /suggestDays\(this\.cities, m\.km\)/.test(tripSrc160) &&
+  /store\.saveTrip\(\{ id: 'T' \+ Date\.now\(\)/.test(tripSrc160) &&
+  /ROUTE_TEMPLATES/.test(tripSrc160));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

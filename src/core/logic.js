@@ -87,22 +87,61 @@ export function locateCity(loc) {
 }
 
 /**
- * 行程里程：pairs 由外部注入的距离计算函数逐段求和
- * calc(fromCity, toCity) → Promise<{km, mode: 'driving'|'straight'}>；抛错回退直线
+ * 行程里程（1.6.0 重构：全有全无 + 环线闭合段 + 分段明细）
+ *
+ * 分段：相邻城市段 (0→1, 1→2, ...) + （城市数 ≥ 3 时）末城→首城的闭合段。
+ * calc(fromCity, toCity) → Promise<{ km, points }>，与 tmap.planRoute 的返回正好对齐。
+ *
+ * 契约（与详情页 1.5.2 一致）：
+ *  - 全部段都成功 → mode='driving'，km = 各段道路 km 之和，legs 每项带 points；
+ *  - 任一段失败 / 无 calc / calc 抛错 → 整体回退 mode='straight'，
+ *    km = 各段（含闭合段）haversine 之和，legs 只含 km、无 points；
+ *  - 禁止混算（不允许一段道路一段直线拼进同一个总数）。
+ *
+ * @returns {{km:number, mode:'driving'|'straight', straightKm:number,
+ *            legs:Array<{from:string,to:string,km:number,points?:Array}>}}
  */
 export async function tripMileage(cityList, calc) {
-  let total = 0, straightTotal = 0, mode = 'straight';
-  for (let i = 0; i < cityList.length - 1; i++) {
-    straightTotal += haversine(cityList[i], cityList[i + 1]);
-    if (calc) {
-      try {
-        const r = await calc(cityList[i], cityList[i + 1]);
-        if (r && r.mode === 'driving') { total += r.km; mode = 'driving'; continue; }
-      } catch (e) { /* 回退直线 */ }
+  const list = cityList || [];
+  if (list.length < 2) return { km: 0, mode: 'straight', straightKm: 0, legs: [] };
+
+  // 1) 分段定义：相邻段 + 闭合段（≥3 城才闭回起点，名副其实的环线）
+  const pairs = [];
+  for (let i = 0; i < list.length - 1; i++) pairs.push([list[i], list[i + 1]]);
+  if (list.length >= 3) pairs.push([list[list.length - 1], list[0]]);
+
+  // 2) 直线兜底（含闭合段），无论是否走道路线都算，供 straightKm 与回退共用
+  const straightLegs = pairs.map(([a, b]) => ({
+    from: a.name, to: b.name, km: Math.round(haversine(a, b))
+  }));
+  // 与分段列表逐行相加严格相等（避免总数与列表差 1km 的观感问题）
+  const straightKm = straightLegs.reduce((s, l) => s + l.km, 0);
+
+  // 3) 全有：逐段规划，任一段不达标立即整体放弃（不留半真半假的线）
+  if (calc) {
+    const acc = [];
+    let ok = true;
+    for (const [a, b] of pairs) {
+      let r = null;
+      try { r = await calc(a, b); } catch (e) { r = null; }
+      if (!r || typeof r.km !== 'number' || !Array.isArray(r.points) || !r.points.length) {
+        ok = false;
+        break;
+      }
+      acc.push({ from: a.name, to: b.name, km: Math.round(r.km), points: r.points });
     }
-    total += straightTotal === 0 ? 0 : haversine(cityList[i], cityList[i + 1]);
+    if (ok && acc.length === pairs.length) {
+      return {
+        km: acc.reduce((s, l) => s + l.km, 0),
+        mode: 'driving',
+        straightKm,
+        legs: acc
+      };
+    }
   }
-  return { km: Math.round(total), mode, straightKm: Math.round(straightTotal) };
+
+  // 4) 全无：整体回退直线（legs 不带 points，避免下游误画）
+  return { km: straightKm, mode: 'straight', straightKm, legs: straightLegs };
 }
 
 /** 建议天数：城市建议天数之和 + 按每天驾驶 500km 估算的赶路天数 */

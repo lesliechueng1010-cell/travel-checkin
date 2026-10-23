@@ -65,14 +65,59 @@ async function plan(path, from, to, mode) {
   return { km: (route.distance || 0) / 1000, mode, points };
 }
 
+const PATHS = {
+  driving: '/ws/direction/v1/driving',
+  walking: '/ws/direction/v1/walking'
+};
+
+/**
+ * 通用路线规划（1.6.0 新增，行程页直接引用）
+ * @param {{lat:number,lng:number}} from
+ * @param {{lat:number,lng:number}} to
+ * @param {'driving'|'walking'} mode
+ * @returns {Promise<{km:number, mode:string, points:Array<{lat:number,lng:number}>}|null>}
+ *          要求：km 为道路里程，points 为解码后的道路点；失败一律 null
+ */
+export function planRoute(from, to, mode = 'driving') {
+  return plan(PATHS[mode] || PATHS.driving, from, to, mode);
+}
+
 /** 驾车路线：from/to 为 {lat,lng}；返回 { km, mode:'driving', points:[{lat,lng}] } 或 null */
 export function driving(from, to) {
-  return plan('/ws/direction/v1/driving', from, to, 'driving');
+  return planRoute(from, to, 'driving');
 }
 
 /** 步行路线：返回 { km, mode:'walking', points } 或 null */
 export function walking(from, to) {
-  return plan('/ws/direction/v1/walking', from, to, 'walking');
+  return planRoute(from, to, 'walking');
+}
+
+/**
+ * 多段道路点首尾去重拼接（1.6.0 从详情页 mergeSegPoints 提为公共实现）
+ * 相邻两段的首尾重合点只保留一个（差值 < 1e-5°≈1m 视为同一点）
+ * @param {Array<Array<{lat:number,lng:number}>>} legsPoints 每段的点数组
+ * @returns {Array<{latitude:number,longitude:number}>} 微信 map polyline 的点格式
+ */
+export function mergeRoutePoints(legsPoints) {
+  const out = [];
+  if (!Array.isArray(legsPoints)) return out;
+  legsPoints.forEach(seg => {
+    (seg || []).forEach((p, i) => {
+      if (!p) return;
+      const lat = p.lat !== undefined ? p.lat : p.latitude;
+      const lng = p.lng !== undefined ? p.lng : p.longitude;
+      // NaN / 缺坐标一律丢弃，不让脏点进地图
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const pt = { latitude: lat, longitude: lng };
+      if (i === 0 && out.length) {
+        const last = out[out.length - 1];
+        if (Math.abs(last.latitude - pt.latitude) < 1e-5 &&
+            Math.abs(last.longitude - pt.longitude) < 1e-5) return;
+      }
+      out.push(pt);
+    });
+  });
+  return out;
 }
 
 /** 城市内美食店搜索：返回 [{title, address, rating?, distText?}] 或 null（未配置 Key） */
@@ -95,4 +140,4 @@ export async function searchFood(city) {
 }
 
 export function hasKey() { return !!CONFIG.tmapKey; }
-export default { driving, walking, searchFood, hasKey, decodePolyline };
+export default { driving, walking, planRoute, mergeRoutePoints, searchFood, hasKey, decodePolyline };

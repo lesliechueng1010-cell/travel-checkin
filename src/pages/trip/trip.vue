@@ -81,6 +81,7 @@
         </view>
       </view>
       <map
+        id="tripMap"
         v-if="cities.length >= 2"
         class="trip-map"
         :latitude="result.center.lat"
@@ -89,6 +90,19 @@
         :markers="result.markers"
         :polyline="result.polyline"
       />
+      <!-- 1.6.0 分段导航：每段一行，闭合段标注「回到起点」，右侧可直接拉起导航 -->
+      <view class="legs" v-if="result.legs && result.legs.length">
+        <view class="legs-head">
+          <text class="legs-title">分段导航</text>
+          <text class="legs-sub">共 {{ result.legs.length }} 段</text>
+        </view>
+        <view class="leg" v-for="(l, i) in result.legs" :key="i">
+          <text class="leg-idx">{{ i + 1 }}.</text>
+          <text class="leg-name">{{ l.from }} → {{ l.to }}<text class="leg-back" v-if="l.closed">（回到起点）</text></text>
+          <text class="leg-km">{{ l.km }} km</text>
+          <button class="btn sm ghost leg-nav" @tap="navLeg(l)">导航</button>
+        </view>
+      </view>
       <button class="btn ghost" style="margin-top:20rpx" @tap="save">💾 保存这条行程</button>
     </view>
 
@@ -159,7 +173,8 @@ import store from '../../core/store.js';
 import { CITIES, findCity, searchCity, PROVINCES, citiesOfProv } from '../../data/cities.js';
 import { tripMileage, suggestDays, kmLabel, haversine } from '../../core/logic.js';
 import { ROUTE_TEMPLATES } from '../../data/routes.js';
-import tmap from '../../utils/tmap.js';
+import tmap, { mergeRoutePoints } from '../../utils/tmap.js';
+import { openNavMenu } from '../../utils/nav.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
 
 export default {
@@ -267,10 +282,20 @@ export default {
     async compute() {
       if (this.cities.length < 2) return;
       uni.showLoading({ title: '路线计算中' });
-      const calc = tmap.hasKey() ? (a, b) => tmap.driving({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }) : null;
+      // 1.6.0：calc 返回 { km, points } —— tmap.planRoute 的结果正好满足 tripMileage 的新契约
+      // （全有全无：任一段失败由 tripMileage 整体回退直线，这里不掺和拼接）
+      const calc = tmap.hasKey()
+        ? (a, b) => tmap.planRoute({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }, 'driving')
+        : null;
       const m = await tripMileage(this.cities, calc);
       const days = suggestDays(this.cities, m.km);
       const lats = this.cities.map(c => c.lat), lngs = this.cities.map(c => c.lng);
+      // 有道路点才画实线；否则城市点 + 回首城闭合点的虚线，绝不混搭
+      const onRoad = m.mode === 'driving' && m.legs.length > 0 && m.legs.every(l => l.points && l.points.length);
+      const line = onRoad
+        ? mergeRoutePoints(m.legs.map(l => l.points))
+        : this.cities.map(c => { return { latitude: c.lat, longitude: c.lng }; })
+          .concat(this.cities.length >= 3 ? [{ latitude: this.cities[0].lat, longitude: this.cities[0].lng }] : []);
       this.result = {
         km: m.km,
         kmLabel: kmLabel(m.mode),
@@ -282,14 +307,34 @@ export default {
           iconPath: i === 0 ? '/static/icons/dot_green.png' : '/static/icons/dot_orange.png',
           callout: { content: (i + 1) + '. ' + c.name, display: 'ALWAYS', fontSize: 10, bgColor: 'rgba(9,30,52,0.94)', color: '#F2EDE3', borderWidth: 1, borderColor: 'rgba(217,179,106,0.45)', padding: 4, borderRadius: 6 }
         })),
-        polyline: [{
-          points: this.cities.map(c => { return { latitude: c.lat, longitude: c.lng }; }).concat(
-            m.mode !== 'driving' && this.cities.length > 2 ? [{ latitude: this.cities[0].lat, longitude: this.cities[0].lng }] : []
-          ),
-          color: '#D9B36A', width: 4, dottedLine: m.mode !== 'driving'
-        }]
+        polyline: [{ points: line, color: '#D9B36A', width: 4, dottedLine: !onRoad }],
+        // 分段明细只留展示字段（points 不回填，避免 setData 重复搬运坐标）
+        legs: m.legs.map((l, i) => ({
+          from: l.from,
+          to: l.to,
+          km: l.km,
+          closed: this.cities.length >= 3 && i === m.legs.length - 1 && l.to === this.cities[0].name
+        }))
       };
       uni.hideLoading();
+      this.$nextTick(() => this.fitMap());
+    },
+    /* 1.6.0：把整条环线（含闭合段）一屏框全 —— 地图 id 见模板 tripMap */
+    fitMap() {
+      const poly = this.result && this.result.polyline && this.result.polyline[0];
+      const pts = poly && poly.points;
+      if (!pts || !pts.length) return;
+      // 地图节点在 setData 后才真正挂载，稍等再框，失败也不影响里程结果
+      setTimeout(() => {
+        try {
+          uni.createMapContext('tripMap', this).includePoints({ points: pts, padding: [48, 48, 48, 48] });
+        } catch (e) { /* 地图未就绪，保留 center + scale 兜底视角 */ }
+      }, 320);
+    },
+    /* 1.6.0：分段导航 —— 直接复用详情页同款三地图菜单 */
+    navLeg(leg) {
+      const c = findCity(leg.to);
+      if (c) openNavMenu(c);
     },
     save() {
       store.saveTrip({ id: 'T' + Date.now(), name: this.tripName || '未命名行程', cities: this.cities.map(c => c.name) });
@@ -344,6 +389,24 @@ export default {
 }
 .res-num { display: block; font-size: 46rpx; font-weight: 800; color: #D9B36A; margin-bottom: 6rpx; }
 .trip-map { width: 100%; height: 440rpx; border-radius: 24rpx; margin-top: 20rpx; }
+
+/* 1.6.0 分段导航列表：与行程行同语言，右侧导航按钮窄一些 */
+.legs { margin-top: 20rpx; }
+.legs-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 4rpx 12rpx; }
+.legs-title { font-size: 28rpx; font-weight: 700; color: #F2EDE3; }
+.legs-sub { font-size: 22rpx; color: rgba(242, 237, 227, 0.45); }
+.leg {
+  display: flex; align-items: center; gap: 12rpx;
+  padding: 16rpx 18rpx; margin-bottom: 10rpx;
+  border-radius: 20rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+}
+.leg-idx { font-size: 24rpx; color: #D9B36A; flex: 0 0 34rpx; }
+.leg-name { flex: 1; font-size: 25rpx; color: #F2EDE3; }
+.leg-back { font-size: 22rpx; color: rgba(217, 179, 106, 0.85); }
+.leg-km { font-size: 24rpx; color: #D9B36A; font-weight: 600; margin-right: 4rpx; }
+.leg-nav { flex: 0 0 auto; }
 
 /* 添加城市弹层：深海蓝玻璃，与 1.1.0 视觉语言一致 */
 .sheet-mask {
