@@ -519,9 +519,17 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.3.4 / 134', manifestSrc.versionName === '1.3.4' && manifestSrc.versionCode === '134');
+assert('版本：1.3.5 / 135', manifestSrc.versionName === '1.3.5' && manifestSrc.versionCode === '135');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
+
+// 31. 1.3.5 构建后置：自动拷云函数 + 写 cloudfunctionRoot，否则开发者工具看不到云函数
+const postbuildSrc = readFileSync(new URL('../scripts/postbuild.mjs', import.meta.url), 'utf8');
+assert('1.3.5 postbuild：脚本含递归拷贝逻辑（拷 cloudfunctions）',
+  /cpSync/.test(postbuildSrc) && /recursive:\s*true/.test(postbuildSrc) &&
+  /cloudfunctions/.test(postbuildSrc));
+assert('1.3.5 postbuild：脚本写入 cloudfunctionRoot 字段',
+  /cloudfunctionRoot/.test(postbuildSrc) && /'cloudfunctions\/'/.test(postbuildSrc));
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
