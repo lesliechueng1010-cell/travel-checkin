@@ -22,11 +22,16 @@ const subs = [];
 function subscribe(fn) { subs.push(fn); }
 function emit() { subs.forEach(f => { try { f(state); } catch (e) {} }); }
 
+// 1.3.3：模块实例内只从本地存档读一次
+// 二次 load 会把内存里的新数据用旧存档覆盖回去，因此加一次性守卫
+let loaded = false;
 function load() {
+  if (loaded) return state;
   try {
     const raw = uni.getStorageSync(KEY);
     if (raw) state = Object.assign(state, typeof raw === 'string' ? JSON.parse(raw) : raw);
   } catch (e) {}
+  loaded = true;
   return state;
 }
 function persist() {
@@ -193,5 +198,15 @@ export function importFootprints(list = []) {
 }
 
 export function getStats() { return stats(state.visited); }
+
+/* ===== 模块顶层自启加载（1.3.3 冷启动丢档修复） =====
+ * 起因：此前只有 boot() 内部调 load()，而 boot() 全项目无人调用（App.vue / main.js / 各页面都没有）。
+ * 冷启动时 state 全是空的，用户随手一个写操作（打卡 / 想去 / 存行程）就会 persist() 把空状态
+ * 整包覆盖 tf_data_v1，老存档被冲掉 —— 表现为「每次更新后点亮数据消失」。
+ * 现在任何页面 import store 时，存档已经在内存里；boot() 内部再调 load() 会被上面的守卫挡住，
+ * 不会用旧存档覆盖内存中新写入的数据，云端 login / pull 逻辑不受影响。
+ */
+load();
+migrate();
 
 export default { get, boot, checkin, uncheckin, toggleWish, saveTrip, removeTrip, setLastLoc, getStats, subscribe, getProfile, setProfile, importFootprints, IMPORT_NOTE };

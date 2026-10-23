@@ -518,7 +518,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.3.2 / 132', manifestSrc.versionName === '1.3.2' && manifestSrc.versionCode === '132');
+assert('版本：1.3.3 / 133', manifestSrc.versionName === '1.3.3' && manifestSrc.versionCode === '133');
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');
@@ -704,5 +704,64 @@ assert('1.3.2 搜索框：外层观感与城市行一致（背景/描边/字号�
   /rgba\(245,\s*240,\s*230,\s*0\.06\)/.test(sheetSearchCss132) &&
   /border-radius:\s*20rpx/.test(pickLineCss132) &&
   /font-size:\s*27rpx/.test(sheetSearchCss132));
+
+/* ===== 30. 1.3.3 冷启动回归：import store 就恢复存档，写操作不再用空状态冲掉老档 =====
+ * 真跑一遍冷启动：把存档预塞进存储桩 → 用全新模块实例重新导入 store（query 让 ESM 缓存失效）
+ * → 不调 boot、不做任何初始化，直接读 get() 看存档在不在 → 再写一个新城市看老城还在不在。
+ */
+const appSrc = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8');
+
+// 冷启动前的存档：已点亮南京、上海，想去里有拉萨
+mem['tf_data_v1'] = {
+  visited: {
+    南京: { date: '2019-04-05', note: '', photo: '', ts: 1 },
+    上海: { date: '2020-10-01', note: '外滩', photo: '', ts: 2 }
+  },
+  wishlist: ['拉萨'],
+  trips: [],
+  profile: { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 }
+};
+
+// 全新模块实例 = 模拟冷启动（?cold=1 使 ESM 走独立实例，state 从空白开始）
+const coldMod = await import('../src/core/store.js?cold=1');
+const coldStore = coldMod.default;
+
+assert('1.3.3 冷启动：仅 import 就恢复存档（未调用 boot、未做任何写操作）',
+  !!coldStore.get().visited['南京'] && !!coldStore.get().visited['上海'] &&
+  coldStore.get().wishlist.includes('拉萨'),
+  `visited=${JSON.stringify(Object.keys(coldStore.get().visited))}`);
+assert('1.3.3 冷启动：恢复的字段完整（日期/笔记不丢）',
+  Object.keys(coldStore.get().visited).length === 2 &&
+  coldStore.get().visited['上海'].date === '2020-10-01' &&
+  coldStore.get().visited['上海'].note === '外滩');
+
+// 冷启动后直接写一个新城市（这正是老版本「点一下就冲掉存档」的动作）
+await coldStore.checkin('北京', { date: '2026-10-20', note: '' });
+const persisted = mem['tf_data_v1'];
+assert('1.3.3 冷启动：写操作后新老城市都在存档里（南京/上海/北京齐全）',
+  !!persisted && !!persisted.visited && !!persisted.visited['南京'] &&
+  !!persisted.visited['上海'] && !!persisted.visited['北京'] &&
+  Object.keys(persisted.visited).length === 3,
+  `persisted=${JSON.stringify(persisted && Object.keys(persisted.visited || {}))}`);
+
+// 守卫：把存储换回旧快照再 boot()，内存里的新数据不能被旧存档盖回去
+mem['tf_data_v1'] = {
+  visited: { 南京: { date: '2019-04-05', note: '', photo: '', ts: 1 } },
+  wishlist: [],
+  trips: []
+};
+await coldStore.boot();
+assert('1.3.3 冷启动：boot() 内的二次 load 被守卫挡住，内存新数据未被旧存档覆盖',
+  !!coldStore.get().visited['北京'] && !!coldStore.get().visited['上海'],
+  `after boot=${JSON.stringify(Object.keys(coldStore.get().visited))}`);
+
+assert('1.3.3 App.vue：onLaunch 里补调 store.boot()',
+  /import store from '\.\/core\/store\.js'/.test(appSrc) &&
+  /onLaunch\s*\(/.test(appSrc) && /store\.boot\(\)/.test(appSrc));
+assert('1.3.3 store：模块顶层自启 load + migrate，且在 export default 之前',
+  /^load\(\);\s*$/m.test(readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8')) &&
+  /^migrate\(\);\s*$/m.test(readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8')) &&
+  readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8').indexOf('load();') <
+  readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8').indexOf('export default {'));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
