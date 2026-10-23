@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.5.0 / 150', manifestSrc.versionName === '1.5.0' && manifestSrc.versionCode === '150');
+assert('版本：1.5.1 / 151', manifestSrc.versionName === '1.5.1' && manifestSrc.versionCode === '151');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -1040,5 +1040,56 @@ assert('1.5.0 详情头图：440rpx 横幅 + 顶部 0.25 渐变罩 + 右下角�
   /linear-gradient\(180deg, rgba\(6,20,38,0\.25\)/.test(detailSrc) &&
   /\.cover-credit/.test(detailSrc) && /font-size:\s*20rpx/.test(detailSrc) &&
   /m\.credit \? m\.scene \+ ' · ' \+ m\.credit : m\.scene/.test(detailSrc));
+
+/* ===== 36. 1.5.1 A：头图点亮（cloud:// 前缀 + 30 城 credit + 两处 scene 修正） ===== */
+assert('1.5.1 photos：PHOTO_BASE 走云存储 cloud:// 且以 /city-photos/ 结尾',
+  /^cloud:\/\//.test(photos.PHOTO_BASE) && /\/city-photos\/$/.test(photos.PHOTO_BASE),
+  photos.PHOTO_BASE);
+assert('1.5.1 photos：30 城 credit 全部非空且含「摄影：」与 Wikimedia Commons',
+  photoKeys.length === 30 && photoKeys.every(n => {
+    const c = photos.CITY_PHOTOS[n].credit;
+    return typeof c === 'string' && c.length > 10 && c.includes('摄影：') && c.includes('Wikimedia Commons');
+  }),
+  photoKeys.filter(n => !photos.CITY_PHOTOS[n].credit).join(','));
+assert('1.5.1 photos：武汉 scene=黄鹤楼、厦门 scene=双子塔黄昏',
+  photos.CITY_PHOTOS['武汉'].scene === '黄鹤楼' && photos.CITY_PHOTOS['厦门'].scene === '双子塔黄昏',
+  photos.CITY_PHOTOS['武汉'].scene + ' / ' + photos.CITY_PHOTOS['厦门'].scene);
+
+/* ===== 37. 1.5.1 B：海报全图化（china-outline 数据 + 年份子集 + 刻度） ===== */
+const outline = await import('../src/data/china-outline.js');
+const outlineNoRing = outline.PROVINCES.filter(p => !p.rings.length).map(p => p.name);
+assert('1.5.1 outline：PROVINCES 恰 34 条且 center / rings 完备（澳门数据无面，仅标注点）',
+  outline.PROVINCES.length === 34 &&
+  outline.PROVINCES.every(p => typeof p.name === 'string' && p.name.length > 0 &&
+    Array.isArray(p.center) && p.center.length === 2 &&
+    typeof p.center[0] === 'number' && typeof p.center[1] === 'number' &&
+    Array.isArray(p.rings) &&
+    p.rings.every(r => Array.isArray(r) && r.length >= 3)) &&
+  outline.PROVINCES.filter(p => p.rings.length > 0).length >= 33,
+  `n=${outline.PROVINCES.length} 无面=${outlineNoRing.join(',')}`);
+assert('1.5.1 outline：CHINA_RINGS ≥ 50 环、SCS 非空且每条环 ≥ 3 点',
+  outline.CHINA_RINGS.length >= 50 && outline.SCS.length > 0 &&
+  outline.CHINA_RINGS.every(r => Array.isArray(r) && r.length >= 3) &&
+  outline.SCS.every(r => Array.isArray(r) && r.length >= 3),
+  `rings=${outline.CHINA_RINGS.length} scs=${outline.SCS.length}`);
+assert('1.5.1 outline：省名与城市数据 prov 全名一一对应（点亮省份可匹配）',
+  new Set(outline.PROVINCES.map(p => p.name)).size === 34 &&
+  [...new Set(CITIES.map(c => c.prov))].every(p => outline.PROVINCES.some(o => o.name === p)));
+
+assert('1.5.1 海报：import china-outline，绘制 CHINA_RINGS / 省界 / SCS 小窗',
+  /from '\.\.\/\.\.\/data\/china-outline\.js'/.test(posterSrc) &&
+  /CHINA_RINGS/.test(posterSrc) && /OUTLINE_PROVINCES/.test(posterSrc) &&
+  /pathRings\(ctx, SCS/.test(posterSrc) && posterSrc.includes('南海诸岛'));
+assert('1.5.1 海报：年份页签状态 + 子集过滤（全部/年份切换重算）',
+  /activeYear/.test(posterSrc) && /function filterByYear\(/.test(posterSrc) &&
+  /function collectYears\(/.test(posterSrc) && /pickYear\(y\)/.test(posterSrc) &&
+  posterSrc.includes('全部') && posterSrc.includes('年度足迹'));
+assert('1.5.1 海报：环刻度 0/25/50/75/100 + 城市名四向候选 + measureText 防重叠',
+  posterSrc.includes('[0, 25, 50, 75, 100]') &&
+  /measureText/.test(posterSrc) && /function rectHit\(/.test(posterSrc) &&
+  /p\.x \+ 9, p\.y - 23/.test(posterSrc) && /p\.x - 9 - tw, p\.y \+ 5/.test(posterSrc));
+assert('1.5.1 海报：旧经纬网格线已删、年份模式环下标签带年份',
+  !posterSrc.includes('淡经纬网格') &&
+  /this\.activeYear \+ ' · 探索中国'/.test(posterSrc));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
