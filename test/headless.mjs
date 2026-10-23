@@ -1034,12 +1034,17 @@ assert('1.5.0 详情头图：PHOTO_BASE + slug + 扩展名拼装，且 PHOTO_BAS
 assert('1.5.0 详情头图：aspectFill 铺满 + 加载失败回退渐变头部',
   /mode="aspectFill"/.test(detailSrc) && /@error="onPhotoError"/.test(detailSrc) &&
   /photoFailed\s*=\s*true/.test(detailSrc) && /!this\.photoFailed/.test(detailSrc));
-assert('1.5.0 详情头图：440rpx 横幅 + 顶部 0.25 渐变罩 + 右下角场景小字',
+assert('1.5.0 详情头图：440rpx 横幅 + 顶部 0.25 渐变罩（署名已移出图面，见 38 节）',
   /\.city-cover\.has-photo/.test(detailSrc) && /height:\s*440rpx/.test(detailSrc) &&
   /cover-scrim/.test(detailSrc) &&
-  /linear-gradient\(180deg, rgba\(6,20,38,0\.25\)/.test(detailSrc) &&
-  /\.cover-credit/.test(detailSrc) && /font-size:\s*20rpx/.test(detailSrc) &&
-  /m\.credit \? m\.scene \+ ' · ' \+ m\.credit : m\.scene/.test(detailSrc));
+  /linear-gradient\(180deg, rgba\(6,20,38,0\.25\)/.test(detailSrc));
+
+/* ===== 38. 署名移位：图面不挂署名，「我的」页集中列图片来源（CC 署名义务保留） ===== */
+const mySrc2 = readFileSync(new URL('../src/pages/my/my.vue', import.meta.url), 'utf8');
+assert('38 署名移位：详情页图面无 cover-credit 元素与样式',
+  !/cover-credit/.test(detailSrc) && !/creditText/.test(detailSrc));
+assert('38 署名移位：「我的」页有图片来源卡，数据源 = CITY_PHOTOS 全量',
+  /图片来源/.test(mySrc2) && /CITY_PHOTOS/.test(mySrc2) && /photoCredits/.test(mySrc2));
 
 /* ===== 36. 1.5.1 A：头图点亮（cloud:// 前缀 + 30 城 credit + 两处 scene 修正） ===== */
 assert('1.5.1 photos：PHOTO_BASE 走云存储 cloud:// 且以 /city-photos/ 结尾',

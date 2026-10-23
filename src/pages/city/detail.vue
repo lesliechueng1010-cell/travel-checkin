@@ -28,7 +28,6 @@
           打卡于 {{ visitedInfo.date || '日期未填' }}<text v-if="visitedInfo.note"> · {{ visitedInfo.note }}</text>
         </view>
       </view>
-      <text v-if="showPhoto && photoMeta" class="cover-credit">{{ creditText }}</text>
     </view>
 
     <!-- 危险注意事项（醒目置顶） -->
@@ -262,11 +261,6 @@ export default {
     showPhoto() {
       return !!this.photoSrc && !this.photoFailed;
     },
-    creditText() {
-      const m = this.photoMeta;
-      if (!m) return '';
-      return m.credit ? m.scene + ' · ' + m.credit : m.scene;
-    }
   },
   methods: {
     /** 图片加载失败：回退渐变头部，不白屏不报错 */
@@ -444,12 +438,6 @@ export default {
   width: 100%; height: 440rpx;
   background: linear-gradient(180deg, rgba(6,20,38,0.25) 0%, rgba(6,20,38,0) 45%, rgba(10,30,52,0.96) 100%);
   pointer-events: none;
-}
-.cover-credit {
-  position: absolute; right: 24rpx; bottom: 14rpx;
-  font-size: 20rpx;
-  color: rgba(255,255,255,0.75);
-  z-index: 2;
 }
 .cover-prov {
   display: block;

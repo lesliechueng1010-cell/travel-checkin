@@ -124,6 +124,15 @@
       <view class="row-item" v-if="cloudOn" @tap="seedGuides"><text>☁️ 初始化云端攻略库</text><text class="tiny">›</text></view>
     </view>
 
+    <!-- 图片来源与授权：头图署名集中列于此（图面不挂字，保持观感） -->
+    <view class="card">
+      <view class="h3">🖼 图片来源</view>
+      <view v-for="c in photoCredits" :key="c.city" class="credit-row">
+        <text class="credit-city">{{ c.city }}</text>
+        <text class="tiny credit-text">{{ c.text }}</text>
+      </view>
+    </view>
+
     <view class="tiny" style="margin:0 24rpx 40rpx">本小程序不提供任何收费功能；攻略信息仅供参考，出行前请核实最新路况。</view>
   </view>
 </template>
@@ -134,6 +143,7 @@ import cache from '../../utils/cache.js';
 import api from '../../api/index.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
 import { GUIDES } from '../../data/guides.js';
+import { CITY_PHOTOS } from '../../data/photos.js';
 import { evaluate } from '../../core/achievements.js';
 import { recentFootprints } from '../../core/logic.js';
 
@@ -151,7 +161,11 @@ export default {
       profile: { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 },
       editingNick: false,
       nickDraft: '',
-      DISCLAIMER: SAFETY_DISCLAIMER
+      DISCLAIMER: SAFETY_DISCLAIMER,
+      /* 头图署名集中展示（CC 授权要求署名：图面保持干净，署名统一收在这里） */
+      photoCredits: Object.entries(CITY_PHOTOS).map(([city, m]) => ({
+        city, text: m.scene + ' · ' + (m.credit || '')
+      }))
     };
   },
   async onShow() {
@@ -416,4 +430,7 @@ export default {
 .empty-actions { display: flex; flex-direction: row; justify-content: center; gap: 16rpx; margin-top: 22rpx; }
 .empty-actions .btn { flex: 0 0 auto; width: 250rpx; padding: 0; }
 .empty-actions .btn.ghost { color: #D9B36A; border-color: rgba(217, 179, 106, 0.42); }
+.credit-row { display: flex; flex-direction: row; gap: 16rpx; padding: 7rpx 0; align-items: baseline; }
+.credit-city { font-size: 24rpx; color: #F2EDE3; min-width: 150rpx; }
+.credit-text { flex: 1; }
 </style>
