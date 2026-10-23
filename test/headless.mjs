@@ -22,6 +22,7 @@ const logic = await import('../src/core/logic.js');
 const cache = (await import('../src/utils/cache.js')).default;
 const guides = await import('../src/data/guides.js.js'.replace(/\.js\.js/, '.js'));
 const { CITIES, findCity, searchCity } = await import('../src/data/cities.js');
+const { CONFIG } = await import('../src/config.js');
 
 // 1. boot（本地模式，无云）
 await store.boot();
@@ -518,7 +519,9 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.3.3 / 133', manifestSrc.versionName === '1.3.3' && manifestSrc.versionCode === '133');
+assert('版本：1.3.4 / 134', manifestSrc.versionName === '1.3.4' && manifestSrc.versionCode === '134');
+assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
+  `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
 // 24. 1.1.1 终版：省行全胶囊 + 提亮填充 + 金色定位针 + 抽屉拖拽横条 + 顶部动态避让
 const provRowCss111 = block('.prov-row');

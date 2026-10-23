@@ -16,7 +16,7 @@
  */
 export const CONFIG = JSON.parse(`{
   "tmapKey": "GNZBZ-RX6YZ-BPRXM-7A42N-S5YRS-BIBVE",
-  "cloudEnv": "",
+  "cloudEnv": "travel-checkin-d6g1yag6s4ceb9790",
   "tmapViaCloud": false
 }`);
 
