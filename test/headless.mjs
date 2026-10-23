@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.5.2 / 152', manifestSrc.versionName === '1.5.2' && manifestSrc.versionCode === '152');
+assert('版本：1.5.3 / 153', manifestSrc.versionName === '1.5.3' && manifestSrc.versionCode === '153');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -1043,8 +1043,9 @@ assert('1.5.0 详情头图：440rpx 横幅 + 顶部 0.25 渐变罩（署名已�
 const mySrc2 = readFileSync(new URL('../src/pages/my/my.vue', import.meta.url), 'utf8');
 assert('38 署名移位：详情页图面无 cover-credit 元素与样式',
   !/cover-credit/.test(detailSrc) && !/creditText/.test(detailSrc));
-assert('38 署名移位：「我的」页有图片来源卡，数据源 = CITY_PHOTOS 全量',
-  /图片来源/.test(mySrc2) && /CITY_PHOTOS/.test(mySrc2) && /photoCredits/.test(mySrc2));
+assert('38 署名移位：「我的」页底部胶囊按钮 + 弹层集中列署名，数据源 = CITY_PHOTOS 全量',
+  /图片来源/.test(mySrc2) && /CITY_PHOTOS/.test(mySrc2) && /photoCredits/.test(mySrc2) &&
+  /credits-capsule/.test(mySrc2) && /showCredits/.test(mySrc2) && /v-if="showCredits"/.test(mySrc2));
 
 /* ===== 36. 1.5.1 A：头图点亮（cloud:// 前缀 + 30 城 credit + 两处 scene 修正） ===== */
 assert('1.5.1 photos：PHOTO_BASE 走云存储 cloud:// 且以 /city-photos/ 结尾',

@@ -124,16 +124,28 @@
       <view class="row-item" v-if="cloudOn" @tap="seedGuides"><text>☁️ 初始化云端攻略库</text><text class="tiny">›</text></view>
     </view>
 
-    <!-- 图片来源与授权：头图署名集中列于此（图面不挂字，保持观感） -->
-    <view class="card">
-      <view class="h3">🖼 图片来源</view>
-      <view v-for="c in photoCredits" :key="c.city" class="credit-row">
-        <text class="credit-city">{{ c.city }}</text>
-        <text class="tiny credit-text">{{ c.text }}</text>
-      </view>
+    <view class="tiny" style="margin:0 24rpx 40rpx">本小程序不提供任何收费功能；攻略信息仅供参考，出行前请核实最新路况。</view>
+
+    <!-- 图片来源入口：页面最底部的胶囊按钮，点开弹层里集中显示署名 -->
+    <view class="credits-entry">
+      <view class="credits-capsule" @tap="showCredits = true">🖼 图片来源</view>
     </view>
 
-    <view class="tiny" style="margin:0 24rpx 40rpx">本小程序不提供任何收费功能；攻略信息仅供参考，出行前请核实最新路况。</view>
+    <!-- 图片来源弹层（头图署名集中于此，图面不挂字） -->
+    <view v-if="showCredits" class="credits-mask" @tap="showCredits = false">
+      <view class="credits-panel" @tap.stop>
+        <view class="credits-head">
+          <text class="h3">🖼 图片来源</text>
+          <text class="credits-close" @tap="showCredits = false">✕</text>
+        </view>
+        <scroll-view scroll-y class="credits-scroll">
+          <view v-for="c in photoCredits" :key="c.city" class="credit-row">
+            <text class="credit-city">{{ c.city }}</text>
+            <text class="tiny credit-text">{{ c.text }}</text>
+          </view>
+        </scroll-view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -161,6 +173,7 @@ export default {
       profile: { avatar: '', nickname: '', updatedAt: 0, syncedAt: 0 },
       editingNick: false,
       nickDraft: '',
+      showCredits: false,
       DISCLAIMER: SAFETY_DISCLAIMER,
       /* 头图署名集中展示（CC 授权要求署名：图面保持干净，署名统一收在这里） */
       photoCredits: Object.entries(CITY_PHOTOS).map(([city, m]) => ({
@@ -433,4 +446,11 @@ export default {
 .credit-row { display: flex; flex-direction: row; gap: 16rpx; padding: 7rpx 0; align-items: baseline; }
 .credit-city { font-size: 24rpx; color: #F2EDE3; min-width: 150rpx; }
 .credit-text { flex: 1; }
+.credits-entry { display: flex; flex-direction: row; justify-content: center; margin: 4rpx 0 56rpx; }
+.credits-capsule { padding: 14rpx 42rpx; border-radius: 999rpx; border: 1rpx solid rgba(217,179,106,0.45); color: #D9B36A; font-size: 24rpx; background: rgba(217,179,106,0.08); }
+.credits-mask { position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: rgba(3,10,20,0.72); z-index: 60; display: flex; flex-direction: column; justify-content: flex-end; }
+.credits-panel { width: 100%; max-height: 78vh; background: #0A1E34; border-radius: 28rpx 28rpx 0 0; padding: 28rpx 28rpx 44rpx; box-sizing: border-box; }
+.credits-head { display: flex; flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 10rpx; }
+.credits-close { color: rgba(242,237,227,0.6); font-size: 30rpx; padding: 6rpx 14rpx; }
+.credits-scroll { max-height: 60vh; }
 </style>
