@@ -35,7 +35,7 @@ export const CITY_PHOTOS = {
   '苏州': { slug: 'suzhou', scene: '金鸡湖东方之门', credit: '用户供图' },
   '厦门': { slug: 'xiamen', scene: '双子塔黄昏', credit: '摄影：周流劲火 · CC BY 2.5 · Wikimedia Commons' },
   '广州': { slug: 'guangzhou', scene: '广州塔夜景', credit: '摄影：Tim Wu · CC BY-SA 4.0 · Wikimedia Commons' },
-  '武汉': { slug: 'wuhan', scene: '黄鹤楼', credit: '摄影：xiquinhosilva · CC BY 2.0 · Wikimedia Commons' },
+  '武汉': { slug: 'wuhan', scene: '黄鹤楼', credit: '用户供图' },
   '天津': { slug: 'tianjin', scene: '天津之眼夜景', credit: '摄影：kele_jb1984 · CC BY-SA 2.0 · Wikimedia Commons' },
   '青岛': { slug: 'qingdao', scene: '栈桥', credit: '摄影：Vitsuha · CC BY-SA 4.0 · Wikimedia Commons' },
   '大连': { slug: 'dalian', scene: '星海广场', credit: '摄影：Air7538 · CC BY-SA 4.0 · Wikimedia Commons' },
