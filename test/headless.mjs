@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.4.2 / 142', manifestSrc.versionName === '1.4.2' && manifestSrc.versionCode === '142');
+assert('版本：1.5.0 / 150', manifestSrc.versionName === '1.5.0' && manifestSrc.versionCode === '150');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -942,5 +942,103 @@ assert('1.4.2 confetti：喷射高度达标（最高点中位 ≥ 屏高 55%、�
     const pct = mins.map(y => (H - y) / H * 100).sort((a, b) => a - b);
     return pct[45] >= 55 && pct[89] <= 100;
   })());
+
+/* ===== 34. 1.5.0 A：足迹报告（时间序 / 里程 / 四极 / 最长段 / 跨度 / 探索度 + 海报版式） ===== */
+const DAY = 86400000;
+const T0 = 1600000000000;
+const vDemo = {
+  '北京': { ts: T0 + 3 * DAY, date: '2023-11-15' },   // 乱序写入：北京最晚
+  '上海': { ts: T0, date: '2020-09-13' },             // 最早
+  '拉萨': { ts: T0 + DAY, date: '2022-04-15' }        // 居中
+};
+const chrono = logic.visitedChrono(vDemo);
+const bj = findCity('北京'), sh = findCity('上海'), ls = findCity('拉萨');
+
+assert('1.5.0 visitedChrono：乱序 ts 按时间升序（上海→拉萨→北京），字段齐全',
+  chrono.map(c => c.name).join(',') === '上海,拉萨,北京' &&
+  chrono.every(c => typeof c.ts === 'number' && !!c.name && typeof c.prov === 'string' &&
+    typeof c.lng === 'number' && typeof c.lat === 'number'),
+  chrono.map(c => c.name).join(','));
+assert('1.5.0 visitedChrono：ts 缺失按 date 兜底，两者都缺按名称稳定排序',
+  (() => {
+    const a = logic.visitedChrono({ '北京': {}, '上海': {}, '拉萨': { date: '2021-01-01' } });
+    return a.map(c => c.name).join(',') === '上海,北京,拉萨' && a[0].ts === 0;
+  })());
+
+const expectKm = Math.round(logic.haversine(sh, ls) + logic.haversine(ls, bj));
+assert('1.5.0 travelMileage：时间序相邻两城 haversine 求和取整',
+  logic.travelMileage(vDemo) === expectKm, `km=${logic.travelMileage(vDemo)} expect=${expectKm}`);
+assert('1.5.0 travelMileage：不足 2 城返回 0',
+  logic.travelMileage({}) === 0 && logic.travelMileage({ '北京': {} }) === 0);
+
+const extremes = logic.extremeCities(vDemo);
+assert('1.5.0 extremeCities：四极正确（北北京 / 南拉萨 / 东上海 / 西拉萨）',
+  !!extremes && extremes.north.name === '北京' && extremes.south.name === '拉萨' &&
+  extremes.east.name === '上海' && extremes.west.name === '拉萨' &&
+  extremes.north.lat >= extremes.south.lat && extremes.east.lng >= extremes.west.lng,
+  JSON.stringify(extremes && { n: extremes.north.name, s: extremes.south.name, e: extremes.east.name, w: extremes.west.name }));
+assert('1.5.0 extremeCities：空数据返回 null', logic.extremeCities({}) === null);
+
+const legA = logic.haversine(sh, ls), legB = logic.haversine(ls, bj);
+const lg = logic.longestLeg(vDemo);
+assert('1.5.0 longestLeg：取时间序最长相邻段 {from,to,km}',
+  !!lg && lg.from === (legA >= legB ? '上海' : '拉萨') &&
+  lg.to === (legA >= legB ? '拉萨' : '北京') &&
+  lg.km === Math.round(Math.max(legA, legB)),
+  JSON.stringify(lg));
+assert('1.5.0 longestLeg：不足 2 城返回 null',
+  logic.longestLeg({}) === null && logic.longestLeg({ '北京': {} }) === null);
+
+assert('1.5.0 footprintSpanDays：最早到最晚整天数差',
+  logic.footprintSpanDays(vDemo) === 3 && logic.footprintSpanDays({}) === 0 &&
+  logic.footprintSpanDays({ '北京': { ts: T0 } }) === 0,
+  `span=${logic.footprintSpanDays(vDemo)}`);
+assert('1.5.0 explorePct：分母为 CITIES 总数，空数据为 0',
+  Math.abs(logic.explorePct(vDemo) - (3 / CITIES.length) * 100) < 1e-9 &&
+  logic.explorePct({}) === 0);
+
+const posterSrc = readFileSync(new URL('../src/pages/poster/poster.vue', import.meta.url), 'utf8');
+assert('1.5.0 海报：含「探索中国」「旅游总里程」，旧版式（省份进度条 / 城市墙）已删',
+  posterSrc.includes('探索中国') && posterSrc.includes('旅游总里程') &&
+  !posterSrc.includes('省份点亮进度') && !posterSrc.includes('我的足迹城市墙'));
+assert('1.5.0 海报：星图投影 + 贝塞尔串联 + 四极/省份/最长段格 + 不足 2 城提示',
+  /projX/.test(posterSrc) && /quadraticCurveTo/.test(posterSrc) &&
+  posterSrc.includes('最北之城') && posterSrc.includes('最东之城') &&
+  posterSrc.includes('点亮省份') && posterSrc.includes('单段最远') &&
+  posterSrc.includes('点亮第 2 座城，开启你的旅行里程') &&
+  /explorePct/.test(posterSrc) && /travelMileage/.test(posterSrc) &&
+  /longestLeg/.test(posterSrc) && /footprintSpanDays/.test(posterSrc));
+
+/* ===== 35. 1.5.0 B：城市详情实拍头图（photos.js + detail.vue） ===== */
+const photos = await import('../src/data/photos.js');
+const photoKeys = Object.keys(photos.CITY_PHOTOS);
+assert('1.5.0 photos：首批 30 城全部 findCity 命中',
+  photoKeys.length === 30 && photoKeys.every(n => !!findCity(n)),
+  `n=${photoKeys.length}`);
+assert('1.5.0 photos：slug 唯一且非空、scene 非空、credit 为字符串',
+  (() => {
+    const slugs = photoKeys.map(n => photos.CITY_PHOTOS[n].slug);
+    return slugs.every(s => typeof s === 'string' && s.length > 0) &&
+      new Set(slugs).size === slugs.length &&
+      photoKeys.every(n => {
+        const p = photos.CITY_PHOTOS[n];
+        return typeof p.scene === 'string' && p.scene.length > 0 && typeof p.credit === 'string';
+      });
+  })());
+assert('1.5.0 photos：PHOTO_BASE 为字符串前缀（留空即不请求）、扩展名 .jpg',
+  typeof photos.PHOTO_BASE === 'string' && photos.PHOTO_EXT === '.jpg');
+
+const detailSrc = readFileSync(new URL('../src/pages/city/detail.vue', import.meta.url), 'utf8');
+assert('1.5.0 详情头图：PHOTO_BASE + slug + 扩展名拼装，且 PHOTO_BASE 为空不发请求',
+  /PHOTO_BASE \+ m\.slug/.test(detailSrc) && /if \(!PHOTO_BASE \|\| !m \|\| !m\.slug\) return ''/.test(detailSrc));
+assert('1.5.0 详情头图：aspectFill 铺满 + 加载失败回退渐变头部',
+  /mode="aspectFill"/.test(detailSrc) && /@error="onPhotoError"/.test(detailSrc) &&
+  /photoFailed\s*=\s*true/.test(detailSrc) && /!this\.photoFailed/.test(detailSrc));
+assert('1.5.0 详情头图：440rpx 横幅 + 顶部 0.25 渐变罩 + 右下角场景小字',
+  /\.city-cover\.has-photo/.test(detailSrc) && /height:\s*440rpx/.test(detailSrc) &&
+  /cover-scrim/.test(detailSrc) &&
+  /linear-gradient\(180deg, rgba\(6,20,38,0\.25\)/.test(detailSrc) &&
+  /\.cover-credit/.test(detailSrc) && /font-size:\s*20rpx/.test(detailSrc) &&
+  /m\.credit \? m\.scene \+ ' · ' \+ m\.credit : m\.scene/.test(detailSrc));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

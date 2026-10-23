@@ -1,7 +1,7 @@
 /**
  * 核心业务逻辑（纯函数，可在 Node 环境单测）
  */
-import { CITIES, PROVINCES, TOTAL_CITIES } from '../data/cities.js';
+import { CITIES, PROVINCES, TOTAL_CITIES, findCity } from '../data/cities.js';
 import { GUIDES } from '../data/guides.js';
 
 /** 两点球面距离（km），输入 {lng, lat} */
@@ -180,5 +180,105 @@ export function seasonalCities(month, visitedMap = {}, n = 10) {
   return Object.keys(GUIDES)
     .filter(name => !visited[name] && seasonMatch(GUIDES[name].season, month))
     .slice(0, n);
+}
+
+/* ============================================================
+ * 1.5.0 足迹报告：时间序 / 里程 / 探索度 / 四极 / 最长段 / 跨度
+ * 纯函数，全部可在 Node 无头测试（不依赖 uni / DOM）
+ * 数据红线：只用本地打卡数据与 cities.js 坐标，不编造任何外部指标
+ * ============================================================ */
+
+/** 打卡时间戳：ts 优先；缺失用 date 兜底；再缺记 0（视为最旧） */
+function visitTs(v) {
+  if (v && typeof v.ts === 'number' && Number.isFinite(v.ts)) return v.ts;
+  const d = v && typeof v.date === 'string' ? v.date.trim() : '';
+  if (d) {
+    const t = Date.parse(d.length <= 10 ? d + 'T00:00:00' : d);
+    if (Number.isFinite(t)) return t;
+  }
+  return 0;
+}
+
+/** 已打卡城市按打卡时间升序（同时间按名称稳定排序）；含 name/prov/lng/lat/ts */
+export function visitedChrono(visitedMap = {}) {
+  const map = visitedMap || {};
+  return Object.keys(map)
+    .map(name => {
+      const c = findCity(name);
+      return {
+        name,
+        prov: (c && c.prov) || '',
+        lng: c ? c.lng : null,
+        lat: c ? c.lat : null,
+        ts: visitTs(map[name])
+      };
+    })
+    .sort((a, b) => {
+      if (a.ts !== b.ts) return a.ts - b.ts;
+      if (a.name === b.name) return 0;
+      return a.name < b.name ? -1 : 1;
+    });
+}
+
+/** 有坐标的时间序城市（缺坐标的城市不参与距离计算） */
+function chronoWithCoord(visitedMap) {
+  return visitedChrono(visitedMap).filter(
+    c => typeof c.lat === 'number' && typeof c.lng === 'number'
+  );
+}
+
+/** 旅游总里程：时间序相邻两城直线距离求和取整 km；不足 2 城返回 0 */
+export function travelMileage(visitedMap = {}) {
+  const list = chronoWithCoord(visitedMap);
+  if (list.length < 2) return 0;
+  let sum = 0;
+  for (let i = 0; i < list.length - 1; i++) sum += haversine(list[i], list[i + 1]);
+  return Math.round(sum);
+}
+
+/** 探索度：已打卡数 / CITIES 总数 × 100（数值，不做四舍五入） */
+export function explorePct(visitedMap = {}) {
+  const n = Object.keys(visitedMap || {}).length;
+  if (!n) return 0;
+  return (n / TOTAL_CITIES) * 100;
+}
+
+/** 四极城市：{ north, south, east, west }（lat/lng 极值）；无数据返回 null */
+export function extremeCities(visitedMap = {}) {
+  const list = chronoWithCoord(visitedMap);
+  if (!list.length) return null;
+  let north = list[0], south = list[0], east = list[0], west = list[0];
+  list.forEach(c => {
+    if (c.lat > north.lat) north = c;
+    if (c.lat < south.lat) south = c;
+    if (c.lng > east.lng) east = c;
+    if (c.lng < west.lng) west = c;
+  });
+  const pick = c => ({ name: c.name, prov: c.prov, lat: c.lat, lng: c.lng });
+  return { north: pick(north), south: pick(south), east: pick(east), west: pick(west) };
+}
+
+/** 时间序最长相邻段 { from, to, km }；不足 2 城返回 null */
+export function longestLeg(visitedMap = {}) {
+  const list = chronoWithCoord(visitedMap);
+  if (list.length < 2) return null;
+  let best = null;
+  for (let i = 0; i < list.length - 1; i++) {
+    const km = haversine(list[i], list[i + 1]);
+    if (!best || km > best._raw) {
+      best = { from: list[i].name, to: list[i + 1].name, km: Math.round(km), _raw: km };
+    }
+  }
+  return best ? { from: best.from, to: best.to, km: best.km } : null;
+}
+
+/** 足迹跨度天数：最晚与最早打卡的整天数差；不足 2 城返回 0 */
+export function footprintSpanDays(visitedMap = {}) {
+  const list = visitedChrono(visitedMap);
+  if (list.length < 2) return 0;
+  const first = list[0].ts;
+  const last = list[list.length - 1].ts;
+  const days = Math.floor((last - first) / 86400000);
+  return days > 0 ? days : 0;
 }
 

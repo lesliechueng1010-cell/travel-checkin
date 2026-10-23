@@ -1,7 +1,15 @@
 <template>
   <view class="page">
-    <!-- 封面区 · 渐变色块 + 大字城市名 -->
-    <view class="city-cover" :style="coverStyle">
+    <!-- 封面区 · 有实拍图时照片横幅（云存储远程加载），否则保持渐变头部 -->
+    <view class="city-cover" :class="{ 'has-photo': showPhoto }" :style="coverStyle">
+      <image
+        v-if="showPhoto"
+        class="cover-photo"
+        :src="photoUrl"
+        mode="aspectFill"
+        @error="onPhotoError"
+      />
+      <view v-if="showPhoto" class="cover-scrim"></view>
       <view class="cover-inner">
         <text class="cover-prov">{{ city.prov }}</text>
         <text class="cover-name">{{ city.name }}</text>
@@ -20,6 +28,7 @@
           打卡于 {{ visitedInfo.date || '日期未填' }}<text v-if="visitedInfo.note"> · {{ visitedInfo.note }}</text>
         </view>
       </view>
+      <text v-if="showPhoto && photoMeta" class="cover-credit">{{ creditText }}</text>
     </view>
 
     <!-- 危险注意事项（醒目置顶） -->
@@ -176,6 +185,7 @@ import { openNavMenu } from '../../utils/nav.js';
 import tmap from '../../utils/tmap.js';
 import cache from '../../utils/cache.js';
 import api from '../../api/index.js';
+import { PHOTO_BASE, PHOTO_EXT, CITY_PHOTOS } from '../../data/photos.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
 
 export default {
@@ -193,6 +203,7 @@ export default {
       foodShops: null,
       foodHint: '',
       routePreview: null,
+      photoFailed: false,
       DISCLAIMER: SAFETY_DISCLAIMER
     };
   },
@@ -215,9 +226,31 @@ export default {
       return {
         background: `linear-gradient(145deg, hsl(${hue}, 42%, 18%) 0%, hsl(${hue}, 38%, 12%) 55%, hsl(${hue2}, 55%, 22%) 100%)`
       };
+    },
+    /* ---------- 1.5.0 实拍头图 ---------- */
+    photoMeta() {
+      return CITY_PHOTOS[this.city.name] || null;
+    },
+    /** PHOTO_BASE 为空（未传图）或该城无图时不拼 URL，也不发任何图片请求 */
+    photoUrl() {
+      const m = this.photoMeta;
+      if (!PHOTO_BASE || !m || !m.slug) return '';
+      return PHOTO_BASE + m.slug + PHOTO_EXT;
+    },
+    showPhoto() {
+      return !!this.photoUrl && !this.photoFailed;
+    },
+    creditText() {
+      const m = this.photoMeta;
+      if (!m) return '';
+      return m.credit ? m.scene + ' · ' + m.credit : m.scene;
     }
   },
   methods: {
+    /** 图片加载失败：回退渐变头部，不白屏不报错 */
+    onPhotoError() {
+      this.photoFailed = true;
+    },
     async loadGuide() {
       // 离线优先：缓存 > 云数据库 > 内置库 > 通用模板；浏览后自动缓存
       const cached = cache.readCache(this.city.name);
@@ -346,6 +379,32 @@ export default {
   pointer-events: none;
 }
 .cover-inner { position: relative; z-index: 1; }
+
+/* 1.5.0 实拍头图：440rpx 照片横幅 + 纵向渐变罩，文字压在横幅下部 */
+.city-cover.has-photo {
+  height: 440rpx;
+  padding: 0 28rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.city-cover.has-photo::after { display: none; }
+.cover-photo {
+  position: absolute; left: 0; top: 0;
+  width: 100%; height: 440rpx;
+}
+.cover-scrim {
+  position: absolute; left: 0; top: 0;
+  width: 100%; height: 440rpx;
+  background: linear-gradient(180deg, rgba(6,20,38,0.25) 0%, rgba(6,20,38,0) 45%, rgba(10,30,52,0.96) 100%);
+  pointer-events: none;
+}
+.cover-credit {
+  position: absolute; right: 24rpx; bottom: 14rpx;
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.75);
+  z-index: 2;
+}
 .cover-prov {
   display: block;
   font-size: 24rpx;
