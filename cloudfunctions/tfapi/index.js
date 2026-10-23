@@ -58,6 +58,19 @@ exports.main = async (event) => {
       return { ok: true, guide: r.data.length ? r.data[0].guide : null };
     }
 
+    if (action === 'photoUrl') {
+      // 头图临时链接：云存储权限是「仅创建者可读写」（免费套餐改不了），
+      // 小程序端直读 cloud:// 会被拒；服务端不受该权限限制，换临时 HTTPS 链接下发。
+      const fileID = String(event.fileID || '');
+      if (!fileID.startsWith('cloud://') || !fileID.includes('/city-photos/') || !fileID.endsWith('.jpg')) {
+        return { ok: false, msg: 'bad fileID' };
+      }
+      const r = await cloud.getTempFileURL({ fileList: [fileID] });
+      const f = r.fileList && r.fileList[0];
+      if (!f || f.status !== 0 || !f.tempFileURL) return { ok: false, msg: 'no temp url' };
+      return { ok: true, url: f.tempFileURL };
+    }
+
     return { ok: false, msg: 'unknown action' };
   } catch (e) {
     return { ok: false, msg: e.errMsg || String(e) };

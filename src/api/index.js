@@ -58,6 +58,18 @@ export async function fetchGuide(cityName) {
 }
 
 /**
+ * 头图临时链接：云存储权限为「仅创建者可读写」时小程序端直读 cloud:// 被拒，
+ * 由云函数（服务端不受该权限限制）换取临时 HTTPS 链接。失败返回 null（前端回退渐变）。
+ */
+export async function fetchPhotoUrl(fileID) {
+  if (!isCloud() || !fileID) return null;
+  try {
+    const r = await cloudCall('tfapi', { action: 'photoUrl', fileID });
+    return r.url || null;
+  } catch (e) { return null; }
+}
+
+/**
  * 用户资料云端同步（按 openid 隔离）
  * 云可用时写 tfapi.updateProfile；未配置云环境或失败时静默返回 null，
  * 资料本身仍存本地 setProfile 的持久化数据。
@@ -78,4 +90,4 @@ export async function pullProfile() {
   } catch (e) { return null; }
 }
 
-export default { isCloud, login, pull, push, fetchGuide, pushProfile, pullProfile };
+export default { isCloud, login, pull, push, fetchGuide, fetchPhotoUrl, pushProfile, pullProfile };

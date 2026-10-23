@@ -1056,6 +1056,14 @@ assert('1.5.1 photos：武汉 scene=黄鹤楼、厦门 scene=双子塔黄昏',
   photos.CITY_PHOTOS['武汉'].scene === '黄鹤楼' && photos.CITY_PHOTOS['厦门'].scene === '双子塔黄昏',
   photos.CITY_PHOTOS['武汉'].scene + ' / ' + photos.CITY_PHOTOS['厦门'].scene);
 
+/* ===== 37. 1.5.1 热修：头图走云函数换临时链接（云存储私有权限下直读 cloud:// 被拒） ===== */
+const tfapiSrc = readFileSync(new URL('../cloudfunctions/tfapi/index.js', import.meta.url), 'utf8');
+const apiSrc = readFileSync(new URL('../src/api/index.js', import.meta.url), 'utf8');
+assert('1.5.1 热修：tfapi 有 photoUrl 动作且走服务端 getTempFileURL、校验 /city-photos/ 路径',
+  /action === 'photoUrl'/.test(tfapiSrc) && /getTempFileURL/.test(tfapiSrc) && /\/city-photos\//.test(tfapiSrc));
+assert('1.5.1 热修：api 有 fetchPhotoUrl；详情页 resolvePhoto 取链、image 绑 photoSrc',
+  /fetchPhotoUrl/.test(apiSrc) && /resolvePhoto/.test(detailSrc) && /:src="photoSrc"/.test(detailSrc));
+
 /* ===== 37. 1.5.1 B：海报全图化（china-outline 数据 + 年份子集 + 刻度） ===== */
 const outline = await import('../src/data/china-outline.js');
 const outlineNoRing = outline.PROVINCES.filter(p => !p.rings.length).map(p => p.name);

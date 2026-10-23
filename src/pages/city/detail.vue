@@ -5,7 +5,7 @@
       <image
         v-if="showPhoto"
         class="cover-photo"
-        :src="photoUrl"
+        :src="photoSrc"
         mode="aspectFill"
         @error="onPhotoError"
       />
@@ -204,6 +204,7 @@ export default {
       foodHint: '',
       routePreview: null,
       photoFailed: false,
+      photoSrc: '',
       DISCLAIMER: SAFETY_DISCLAIMER
     };
   },
@@ -213,6 +214,7 @@ export default {
     if (!city) { uni.showToast({ title: '城市不存在', icon: 'none' }); setTimeout(() => uni.navigateBack(), 800); return; }
     this.city = city;
     this.loadGuide();
+    this.resolvePhoto();
     this.refreshState();
   },
   onShow() { this.refreshState(); },
@@ -238,7 +240,7 @@ export default {
       return PHOTO_BASE + m.slug + PHOTO_EXT;
     },
     showPhoto() {
-      return !!this.photoUrl && !this.photoFailed;
+      return !!this.photoSrc && !this.photoFailed;
     },
     creditText() {
       const m = this.photoMeta;
@@ -250,6 +252,14 @@ export default {
     /** 图片加载失败：回退渐变头部，不白屏不报错 */
     onPhotoError() {
       this.photoFailed = true;
+    },
+    /** 头图取链：云存储私有权限下直读 cloud:// 被拒，改走云函数换临时 HTTPS 链接 */
+    async resolvePhoto() {
+      const fid = this.photoUrl;
+      if (!fid) return;
+      const url = await api.fetchPhotoUrl(fid);
+      if (url) this.photoSrc = url;
+      else this.photoFailed = true;
     },
     async loadGuide() {
       // 离线优先：缓存 > 云数据库 > 内置库 > 通用模板；浏览后自动缓存
