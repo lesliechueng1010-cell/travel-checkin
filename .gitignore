@@ -7,3 +7,6 @@ unpackage/
 *.local
 .env*
 !.env.example
+
+# 坐标核正断点缓存（本地）
+.geocode-cache.json

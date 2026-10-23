@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.5.1 / 151', manifestSrc.versionName === '1.5.1' && manifestSrc.versionCode === '151');
+assert('版本：1.5.2 / 152', manifestSrc.versionName === '1.5.2' && manifestSrc.versionCode === '152');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -1100,5 +1100,133 @@ assert('1.5.1 海报：环刻度 0/25/50/75/100 + 城市名四向候选 + measur
 assert('1.5.1 海报：旧经纬网格线已删、年份模式环下标签带年份',
   !posterSrc.includes('淡经纬网格') &&
   /this\.activeYear \+ ' · 探索中国'/.test(posterSrc));
+
+/* ===== 38. 1.5.2 A：预览画真实道路线（polyline 解码 + 全段成功才用实线） ===== */
+const tmap = await import('../src/utils/tmap.js');
+const detailSrc152 = readFileSync(new URL('../src/pages/city/detail.vue', import.meta.url), 'utf8');
+
+assert('1.5.2 A：decodePolyline 首点取绝对值、其后按同维度增量累加',
+  (() => {
+    const p = tmap.decodePolyline([39917990, 116397027, 12, -8, 10, 10]);
+    return p.length === 3 &&
+      p[0].lat === 39.91799 && p[0].lng === 116.397027 &&
+      Math.abs(p[1].lat - 39.918002) < 1e-9 && Math.abs(p[1].lng - 116.397019) < 1e-9 &&
+      Math.abs(p[2].lat - 39.918012) < 1e-9 && Math.abs(p[2].lng - 116.397029) < 1e-9;
+  })());
+assert('1.5.2 A：decodePolyline 非法输入返回空数组（不编造坐标）',
+  tmap.decodePolyline([]).length === 0 && tmap.decodePolyline([123]).length === 0 &&
+  tmap.decodePolyline('x,y').length === 0 && tmap.decodePolyline(null).length === 0);
+
+// 用假 uni.request 走一遍真实请求链路：距 12345m + 3 点压缩坐标
+const realRequest = globalThis.uni.request;
+const reply = (data) => { globalThis.uni.request = opt => opt.success({ statusCode: 200, data }); };
+const A = { lat: 39.9, lng: 116.4 }, B = { lat: 40, lng: 116.5 };
+reply({ status: 0, result: { routes: [{ distance: 12345, polyline: [39917990, 116397027, 12, -8, 10, 10] }] } });
+const rDrive = await tmap.driving(A, B);
+const rWalk = await tmap.walking(A, B);
+reply({ status: 0, result: { routes: [] } });
+const rEmpty = await tmap.driving(A, B);
+reply({ status: 0, result: { routes: [{ distance: 1000 }] } });
+const rNoLine = await tmap.driving(A, B);
+reply({ status: 120, message: 'QPS 超限' });
+const rBad = await tmap.driving(A, B);
+globalThis.uni.request = realRequest;
+
+assert('1.5.2 A：driving 返回 { km, mode, points }（km = distance/1000）',
+  !!rDrive && rDrive.mode === 'driving' && Math.abs(rDrive.km - 12.345) < 1e-9 &&
+  rDrive.points.length === 3 && rDrive.points[0].lat === 39.91799,
+  rDrive ? `km=${rDrive.km} pts=${rDrive.points.length}` : 'null');
+assert('1.5.2 A：walking 的 mode 由误写的 driving 改为 walking',
+  !!rWalk && rWalk.mode === 'walking' && rWalk.points.length === 3,
+  rWalk ? rWalk.mode : 'null');
+assert('1.5.2 A：无 routes / 无 polyline / 非 0 状态一律返回 null',
+  rEmpty === null && rNoLine === null && rBad === null);
+
+assert('1.5.2 A：kmLabel 三态（驾车/步行实时计算、直线距离估算）',
+  logic.kmLabel('driving').includes('驾车') && logic.kmLabel('driving').includes('实时计算') &&
+  logic.kmLabel('walking').includes('步行') && logic.kmLabel('walking').includes('实时计算') &&
+  logic.kmLabel('straight') === '直线距离估算' && logic.kmLabel(undefined) === '直线距离估算');
+
+assert('1.5.2 A：previewRoute 逐段规划，全部成功才采用道路线（无逐段混搭）',
+  detailSrc152.includes('segs = acc.length === pts.length - 1 ? acc : null') &&
+  /mode = roadMode/.test(detailSrc) &&
+  !/if \(r\) \{ km \+= r\.km; mode = 'driving'; \}/.test(detailSrc) &&
+  /kmLabel\(mode\)/.test(detailSrc));
+assert('1.5.2 A：实线/虚线按 mode 切换 + 衔接点去重后单条 polyline',
+  /function mergeSegPoints\(/.test(detailSrc) &&
+  /points: line,/.test(detailSrc) &&
+  /dottedLine: mode === 'straight'/.test(detailSrc));
+
+/* ===== 39. 1.5.2 B：全量坐标基线（guides.js 逐点比对 + 相邻段核验） ===== */
+const baseline = JSON.parse(readFileSync(new URL('../test/geocode-baseline.json', import.meta.url), 'utf8'));
+const baseCities = Object.keys(baseline.cities);
+let baseRoutes = 0, basePoints = 0;
+for (const c of baseCities) {
+  for (const k of ['drive', 'hike']) {
+    for (const rn of Object.keys(baseline.cities[c][k] || {})) {
+      baseRoutes++;
+      basePoints += baseline.cities[c][k][rn].length;
+    }
+  }
+}
+assert('1.5.2 B：基线覆盖 99 城 / 213 条路线 / 519 个点',
+  baseline.version === '1.5.2' && baseCities.length === 99 &&
+  baseRoutes === 213 && basePoints === 519,
+  `v=${baseline.version} 城=${baseCities.length} 线=${baseRoutes} 点=${basePoints}`);
+
+const coordDiffs = [];
+for (const cityName of Object.keys(guides.GUIDES)) {
+  const g = guides.GUIDES[cityName];
+  for (const kind of ['drive', 'hike']) {
+    for (const route of (g[kind] || [])) {
+      const rows = ((baseline.cities[cityName] || {})[kind] || {})[route.n];
+      if (!rows) { coordDiffs.push(`${cityName}/${route.n} 基线缺失`); continue; }
+      if (rows.length !== (route.points || []).length) {
+        coordDiffs.push(`${cityName}/${route.n} 点数 ${rows.length}≠${route.points.length}`); continue;
+      }
+      (route.points || []).forEach((p, i) => {
+        if (rows[i].n !== p.n || rows[i].lng !== p.lng || rows[i].lat !== p.lat) {
+          coordDiffs.push(`${cityName}/${route.n}/${p.n}`);
+        }
+      });
+    }
+  }
+}
+assert('1.5.2 B：guides.js 全部路线点坐标与基线逐一相等（防日后回退）',
+  coordDiffs.length === 0, coordDiffs.slice(0, 4).join(' ; '));
+
+const exemptKeys = new Set((baseline.exemptions || []).map(e => `${e.city}|${e.kind}|${e.route}|${e.from}→${e.to}`));
+const badSegs = [];
+for (const cityName of Object.keys(baseline.cities)) {
+  for (const kind of ['drive', 'hike']) {
+    for (const routeName of Object.keys(baseline.cities[cityName][kind] || {})) {
+      const rows = baseline.cities[cityName][kind][routeName];
+      for (let i = 0; i < rows.length - 1; i++) {
+        const km = logic.haversine(rows[i], rows[i + 1]);
+        const key = `${cityName}|${kind}|${routeName}|${rows[i].n}→${rows[i + 1].n}`;
+        if (km > baseline.maxSegmentKm && !exemptKeys.has(key)) {
+          badSegs.push(`${cityName}/${routeName} ${rows[i].n}→${rows[i + 1].n} ${km.toFixed(1)}km`);
+        }
+      }
+    }
+  }
+}
+assert('1.5.2 B：每条路线相邻段直线距离 ≤ 200km（超限须显式豁免）',
+  badSegs.length === 0, badSegs.slice(0, 4).join(' ; '));
+assert('1.5.2 B：豁免段均注明理由且 km 确已超限',
+  baseline.exemptions.length > 0 &&
+  baseline.exemptions.every(e => typeof e.reason === 'string' && e.reason.length >= 8 && e.km > baseline.maxSegmentKm),
+  `${baseline.exemptions.length} 段`);
+assert('1.5.2 B：无锡太湖风光线三点纳入基线（不再手工填坐标）',
+  ((baseline.cities['无锡'] || {}).drive || {})['太湖风光线'] &&
+  baseline.cities['无锡'].drive['太湖风光线'].length === 3);
+
+const auditSrc = readFileSync(new URL('../scripts/geocode-audit.mjs', import.meta.url), 'utf8');
+assert('1.5.2 B：核正脚本走 place/v1/search，Key 只从 config.js 读、无硬编码',
+  auditSrc.includes('/ws/place/v1/search') && auditSrc.includes('CONFIG.tmapKey') &&
+  !/[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}/.test(auditSrc) &&
+  !/tmapKey\s*[:=]\s*['"][^'"]+['"]/.test(auditSrc));
+assert('1.5.2 B：遇配额类致命状态立即停（121/110/111/112/199 白名单 + 不重试）',
+  /FATAL_STATUS/.test(auditSrc) && auditSrc.includes('121') && auditSrc.includes('process.exit(3)'));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

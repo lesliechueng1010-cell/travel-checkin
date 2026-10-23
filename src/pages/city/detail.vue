@@ -188,6 +188,26 @@ import api from '../../api/index.js';
 import { PHOTO_BASE, PHOTO_EXT, CITY_PHOTOS } from '../../data/photos.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
 
+/**
+ * 多段道路线拼接为一条 polyline
+ * 路段之间首尾重合的衔接点只保留一个（差值 < 1e-5°≈1m 视为同一点）
+ */
+function mergeSegPoints(segs) {
+  const out = [];
+  segs.forEach(s => {
+    (s.points || []).forEach((p, i) => {
+      const pt = { latitude: p.lat, longitude: p.lng };
+      if (i === 0 && out.length) {
+        const last = out[out.length - 1];
+        if (Math.abs(last.latitude - pt.latitude) < 1e-5 &&
+            Math.abs(last.longitude - pt.longitude) < 1e-5) return;
+      }
+      out.push(pt);
+    });
+  });
+  return out;
+}
+
 export default {
   data() {
     return {
@@ -339,16 +359,32 @@ export default {
       const pts = route.points || [];
       if (!pts.length) return;
       uni.showLoading({ title: '计算里程' });
-      let km = 0, mode = 'straight';
-      if (tmap.hasKey()) {
+      const plan = kind === 'hike' ? tmap.walking : tmap.driving;
+      const roadMode = kind === 'hike' ? 'walking' : 'driving';
+      // 逐段规划：每一段都拿到道路线才采用；任一段失败 / 无 Key → 整条回退直线虚线
+      // （不做「前面实线后面虚线」的混搭，也不给直线距离贴「实时计算」的标签）
+      let segs = null;
+      if (tmap.hasKey() && pts.length > 1) {
+        const acc = [];
         for (let i = 0; i < pts.length - 1; i++) {
-          const r = kind === 'hike'
-            ? await tmap.walking({ lat: pts[i].lat, lng: pts[i].lng }, { lat: pts[i + 1].lat, lng: pts[i + 1].lng })
-            : await tmap.driving({ lat: pts[i].lat, lng: pts[i].lng }, { lat: pts[i + 1].lat, lng: pts[i + 1].lng });
-          if (r) { km += r.km; mode = 'driving'; } else { km += haversine(pts[i], pts[i + 1]); }
+          const r = await plan(
+            { lat: pts[i].lat, lng: pts[i].lng },
+            { lat: pts[i + 1].lat, lng: pts[i + 1].lng }
+          );
+          if (!r || !r.points || r.points.length < 2) { acc.length = 0; break; }
+          acc.push(r);
         }
+        segs = acc.length === pts.length - 1 ? acc : null;
+      }
+      let km = 0, mode = 'straight', line = null;
+      if (segs && segs.length) {
+        // 各段真实里程求和；各段坐标串首尾衔接，去掉重复的衔接点
+        km = segs.reduce((s, r) => s + r.km, 0);
+        mode = roadMode;
+        line = mergeSegPoints(segs);
       } else {
         for (let i = 0; i < pts.length - 1; i++) km += haversine(pts[i], pts[i + 1]);
+        line = pts.map(p => ({ latitude: p.lat, longitude: p.lng }));
       }
       const lats = pts.map(p => p.lat), lngs = pts.map(p => p.lng);
       this.routePreview = {
@@ -361,7 +397,7 @@ export default {
           callout: { content: p.n, display: 'ALWAYS', fontSize: 10, bgColor: 'rgba(9,30,52,0.94)', color: '#F2EDE3', padding: 5, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(217,179,106,0.45)' }
         })),
         polyline: [{
-          points: pts.map(p => { return { latitude: p.lat, longitude: p.lng }; }),
+          points: line,
           color: '#D9B36A', width: 4, dottedLine: mode === 'straight'
         }],
         kmText: Math.round(km) + ' km',

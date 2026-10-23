@@ -117,7 +117,9 @@ export function suggestDays(cityList, mileageKm) {
 
 /** 里程展示文案（红线：未配置 Key 只能显示直线估算，并明确标注） */
 export function kmLabel(mode) {
-  return mode === 'driving' ? '驾车里程（路线规划实时计算）' : '直线估算（配置地图 Key 后显示真实驾车里程）';
+  if (mode === 'driving') return '驾车里程（路线规划实时计算）';
+  if (mode === 'walking') return '步行里程（步行路线实时计算）';
+  return '直线距离估算';
 }
 
 export function fmtKm(km) { return km >= 10000 ? (km / 10000).toFixed(1) + ' 万 km' : km + ' km'; }
