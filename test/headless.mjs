@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.4.0 / 140', manifestSrc.versionName === '1.4.0' && manifestSrc.versionCode === '140');
+assert('版本：1.4.1 / 141', manifestSrc.versionName === '1.4.1' && manifestSrc.versionCode === '141');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -857,5 +857,75 @@ assert('1.4.0 行程页：环线模板区 + 一键载入',
   /ROUTE_TEMPLATES/.test(tripSrc2) && tripSrc2.includes('一键载入') && /loadTemplate\s*\(/.test(tripSrc2));
 assert('1.4.0 行程页：想去一键成行（wishlist≥2 显示）',
   tripSrc2.includes('一键串成环线') && /wishlist\.length\s*>=\s*2/.test(tripSrc2) && /loadWishList\s*\(/.test(tripSrc2));
+
+/* ===== 33. 1.4.1 抽卡变脸修复 + 礼花喷射彩带 ===== */
+// A. 抽卡结果变脸：draw() 先定 _target，末段钉住，finishDraw 直接用、不再随机
+const drawBody = (() => {
+  const i = wishSrc.indexOf('    draw() {');
+  const j = wishSrc.indexOf('    stopRoll() {', i);
+  return i >= 0 && j > i ? wishSrc.slice(i, j) : '';
+})();
+const finishBody = (() => {
+  const i = wishSrc.indexOf('    finishDraw() {');
+  const j = wishSrc.indexOf('    addDrawnWish() {', i);
+  return i >= 0 && j > i ? wishSrc.slice(i, j) : '';
+})();
+assert('1.4.1 抽卡：finishDraw 函数体内不含 Math.random（结果不重抽）',
+  finishBody.length > 0 && !/Math\.random/.test(finishBody) && /this\._target/.test(finishBody));
+assert('1.4.1 抽卡：draw() 开场定选 _target（取自 drawPool）',
+  /this\._target\s*=\s*pool\[/.test(drawBody) && /drawPool\(/.test(drawBody));
+assert('1.4.1 抽卡：末段（≥950ms）rollName 固定为 _target 并保持到结束',
+  /t\s*>=\s*950/.test(drawBody) && /this\.rollName\s*=\s*this\._target/.test(drawBody));
+
+// B. 彩带：canvas 粒子引擎
+assert('1.4.1 confetti：鲜艳配色七色齐全 + 香槟金仅作点缀',
+  ['#FF4757', '#FF9F43', '#FFD32A', '#2ED573', '#54A0FF', '#A55EEA', '#FD79A8'].every(c => confettiSrc.includes(c)) &&
+  /ACCENT_RATIO\s*=\s*0\.1/.test(confettiSrc) && /CONFETTI_ACCENT/.test(confettiSrc));
+assert('1.4.1 confetti：粒子引擎含初速度 / 重力 / 阻力 / 自旋转 / 生命周期',
+  /vx\s*:/.test(confettiSrc) && /vy\s*:/.test(confettiSrc) &&
+  /GRAVITY/.test(confettiSrc) && /AIR_DRAG/.test(confettiSrc) &&
+  /vr\s*:/.test(confettiSrc) && /life\s*\+=/.test(confettiSrc) && /maxLife/.test(confettiSrc) &&
+  /export function createBurst/.test(confettiSrc) && /export function stepParticles/.test(confettiSrc));
+assert('1.4.1 confetti：双喷口 + 停帧清理（rAF / 定时器）',
+  /NOZZLE_LEFT/.test(confettiSrc) && /NOZZLE_RIGHT/.test(confettiSrc) &&
+  /cancelAnimationFrame/.test(confettiSrc) && /clearTimeout/.test(confettiSrc) &&
+  /export function clearConfetti/.test(confettiSrc) && /stopped/.test(confettiSrc));
+assert('1.4.1 confetti：旧 CSS 飘落实现已移除（无 confettiPieces / keyframes）',
+  !/confettiPieces/.test(confettiSrc) && !/@keyframes/.test(confettiSrc) &&
+  !/confetti-fall/.test(wishSrc) && !/confetti-layer/.test(wishSrc) && !/confettiParts/.test(wishSrc));
+assert('1.4.1 想去页：抽卡定格处触发 canvas 喷射，按窗口尺寸 + 像素比设画布',
+  /type="2d"/.test(wishSrc) && /getContext\('2d'\)/.test(wishSrc) &&
+  /confetti\.playConfetti\(/.test(wishSrc) && /canvas:\s*canvas/.test(wishSrc) &&
+  /pixelRatio/.test(wishSrc) && /canvas\.width\s*=/.test(wishSrc) && /windowWidth/.test(wishSrc));
+assert('1.4.1 想去页：onHide / onUnload 停引擎清帧',
+  (() => {
+    const grab = (key) => {
+      const i = wishSrc.indexOf(key + '()');
+      const j = wishSrc.indexOf('},', i);
+      return i >= 0 && j > i ? wishSrc.slice(i, j) : '';
+    };
+    const hide = grab('onHide');
+    const unload = grab('onUnload');
+    return /clearConfetti\(\)/.test(hide) && /clearConfetti\(\)/.test(unload) &&
+      /stopRoll\(\)/.test(hide) && /stopRoll\(\)/.test(unload);
+  })());
+
+// B'. 引擎纯函数实跑：出片数、双喷口仰射、生命耗尽后归零
+const cf = await import('../src/utils/confetti.js');
+const burst = cf.createBurst(375, 667, cf.CONFETTI_COUNT);
+assert('1.4.1 confetti：单次 90 片，全部向上喷出并分左右两喷口',
+  burst.length === 90 &&
+  burst.every(p => p.vy < 0 && p.x >= 0 && p.x <= 375) &&
+  burst.some(p => p.x < 375 * 0.3 && p.vx > 0) &&   // 左喷口向右上
+  burst.some(p => p.x > 375 * 0.7 && p.vx < 0) &&   // 右喷口向左上
+  burst.every(p => cf.CONFETTI_COLORS.includes(p.color) || p.color === cf.CONFETTI_ACCENT),
+  `n=${burst.length}`);
+assert('1.4.1 confetti：粒子约 2s 内自然消亡（生命周期生效）',
+  (() => {
+    const list = cf.createBurst(375, 667, 90);
+    let alive = 0;
+    for (let i = 0; i < 130; i++) alive = cf.stepParticles(list, 1 / 60, 375, 667); // ≈2.17s
+    return alive === 0;
+  })());
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

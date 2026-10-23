@@ -92,10 +92,13 @@
 
     <view class="notice" style="margin: 0 24rpx">提示：允许定位后，清单会按离你的距离由近到远排序，并推荐最近的未去城市。</view>
 
-    <!-- 抽卡彩带层：pointer-events:none 不挡操作，播完自动隐藏 -->
-    <view class="confetti-layer" v-if="confettiOn">
-      <view class="confetti-piece" v-for="p in confettiParts" :key="p.id" :style="pieceStyle(p)"></view>
-    </view>
+    <!-- 抽卡彩带层：canvas 2d 礼花喷射，pointer-events:none 不挡操作，播完隐藏 -->
+    <canvas
+      id="confetti-canvas"
+      type="2d"
+      class="confetti-canvas"
+      :class="{ 'is-on': confettiOn }"
+    ></canvas>
   </view>
 </template>
 
@@ -118,8 +121,7 @@ export default {
       rolling: false,
       drawn: null,
       rollName: '',
-      confettiOn: false,
-      confettiParts: []
+      confettiOn: false
     };
   },
   onShow() {
@@ -184,16 +186,19 @@ export default {
       this.stopRoll();
       this.drawn = null;
       this.rolling = true;
+      // 先定下本次结果：动画从这里起步，之后不再改，避免「停住的名字被换掉」
+      this._target = pool[Math.floor(Math.random() * pool.length)];
       this.rollName = pool[Math.floor(Math.random() * pool.length)];
-      this._pool = pool;
       this._tick = 0;
       this._rollStart = Date.now();
-      // 快速滚动约 1.2s，越接近结束换字越慢，最后定格
+      // 快速滚动约 1.2s，越接近结束换字越慢，末段直接钉在结果上
       this._timer = setInterval(() => {
         const t = Date.now() - this._rollStart;
         if (t >= 1200) { this.finishDraw(); return; }
+        // 末段（≥ 950ms）：名字固定为 _target 并保持到结束，视觉上"落"在结果上
+        if (t >= 950) { this.rollName = this._target; return; }
         this._tick++;
-        const gap = t < 500 ? 1 : t < 800 ? 2 : t < 1000 ? 4 : 6;
+        const gap = t < 500 ? 1 : t < 800 ? 2 : 4;
         if (this._tick % gap === 0) this.rollName = pool[Math.floor(Math.random() * pool.length)];
       }, 50);
     },
@@ -205,9 +210,9 @@ export default {
     },
     finishDraw() {
       this.stopRoll();
-      const pool = this._pool || [];
-      if (!pool.length) { this.rolling = false; return; }
-      const name = pool[Math.floor(Math.random() * pool.length)];
+      // 结果就是 draw() 时定下的 _target，这里不再重新抽取
+      const name = this._target;
+      if (!name) { this.rolling = false; return; }
       const c = findCity(name);
       const g = GUIDES[name];
       const s = store.get();
@@ -241,23 +246,39 @@ export default {
       this.refresh();
     },
 
-    /* ---------- 彩带 ---------- */
+    /* ---------- 彩带（canvas 礼花喷射） ---------- */
     playConfetti() {
-      confetti.clearConfetti();
-      this.confettiOn = false;                 // 先撤下上一轮，避免叠层
-      this.confettiParts = confetti.confettiPieces();
-      const show = () => {
-        this.confettiOn = true;
-        confetti.playConfetti(() => { this.confettiOn = false; });
-      };
-      if (this.$nextTick) this.$nextTick(show);
-      else setTimeout(show, 0);
+      confetti.clearConfetti();   // 连续抽卡先停上一轮，不叠层
+      this.confettiOn = true;
+      const run = () => this.burstConfetti();
+      if (this.$nextTick) this.$nextTick(run);
+      else setTimeout(run, 0);
     },
-    pieceStyle(p) {
-      return 'left:' + p.left + '%;background:' + p.color +
-        ';width:' + p.width + 'rpx;height:' + p.height + 'rpx' +
-        ';animation-delay:' + p.delay + 'ms;animation-duration:' + p.duration + 'ms' +
-        ';--drift:' + p.drift + 'rpx;--rot:' + p.rot + 'deg;';
+    burstConfetti() {
+      let query = null;
+      try { query = uni.createSelectorQuery().in(this); } catch (e) { query = uni.createSelectorQuery(); }
+      query.select('#confetti-canvas').fields({ node: true, size: true }).exec((res) => {
+        const hit = res && res[0];
+        // 取不到节点（如 H5 / 调试态）就静默跳过，不影响抽卡结果
+        if (!hit || !hit.node) { this.confettiOn = false; return; }
+        const canvas = hit.node;
+        const ctx = canvas.getContext('2d');
+        const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {};
+        const dpr = sys.pixelRatio || 2;
+        const w = Math.round(sys.windowWidth || hit.width || 375);
+        const h = Math.round(sys.windowHeight || hit.height || 667);
+        // 画布按窗口尺寸 × 像素比设置，保证真机上纸片大小观感正常
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        ctx.scale(dpr, dpr);
+        confetti.playConfetti({
+          canvas: canvas,
+          ctx: ctx,
+          width: w,
+          height: h,
+          onEnd: () => { this.confettiOn = false; }
+        });
+      });
     },
 
     /* ---------- 列表操作 ---------- */
@@ -344,22 +365,12 @@ export default {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
-/* 彩带层：整屏、不挡操作 */
-.confetti-layer {
-  position: fixed; left: 0; right: 0; top: 0; bottom: 0;
-  z-index: 999; pointer-events: none; overflow: hidden;
+/* 彩带层：整屏 canvas，pointer-events:none 不挡操作，播完自动隐藏 */
+.confetti-canvas {
+  position: fixed; left: 0; top: 0;
+  width: 100vw; height: 100vh;
+  z-index: 999; pointer-events: none;
+  opacity: 0; visibility: hidden;
 }
-.confetti-piece {
-  position: absolute; top: -30rpx;
-  border-radius: 2rpx;
-  opacity: 0.95;
-  animation-name: confetti-fall;
-  animation-timing-function: ease-in;
-  animation-fill-mode: forwards;
-}
-@keyframes confetti-fall {
-  0% { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 0; }
-  10% { opacity: 0.95; }
-  100% { transform: translate3d(var(--drift, 0rpx), 104vh, 0) rotate(var(--rot, 360deg)); opacity: 0.85; }
-}
+.confetti-canvas.is-on { opacity: 1; visibility: visible; }
 </style>
