@@ -42,7 +42,7 @@ const ACCENT_RATIO = 0.1;
 const GRAVITY = 1100;
 
 /** 空气阻力（按 60fps 归一的衰减系数） */
-const AIR_DRAG = 0.965;
+const AIR_DRAG = 0.975;
 
 /** 喷口水平位置（占画布宽度比例）：左下 / 右下 */
 const NOZZLE_LEFT = 0.1;
@@ -100,7 +100,7 @@ export function createBurst(width, height, count = CONFETTI_COUNT) {
     const nozzleX = fromLeft ? width * NOZZLE_LEFT : width * NOZZLE_RIGHT;
     const inward = fromLeft ? 1 : -1;
     // 初速度：向上为主（基速随屏高自适应）+ 水平朝内分量
-    const baseSpeed = height * (1.5 + Math.random() * 0.5);
+    const baseSpeed = height * (2.0 + Math.random() * 0.6);
     const angle = ((56 + Math.random() * 24) * Math.PI) / 180; // 与水平面夹角
     const vx = inward * Math.cos(angle) * baseSpeed * 0.55;
     const vy = -Math.sin(angle) * baseSpeed;

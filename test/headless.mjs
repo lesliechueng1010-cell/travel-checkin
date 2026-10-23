@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.4.1 / 141', manifestSrc.versionName === '1.4.1' && manifestSrc.versionCode === '141');
+assert('版本：1.4.2 / 142', manifestSrc.versionName === '1.4.2' && manifestSrc.versionCode === '142');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -926,6 +926,21 @@ assert('1.4.1 confetti：粒子约 2s 内自然消亡（生命周期生效）',
     let alive = 0;
     for (let i = 0; i < 130; i++) alive = cf.stepParticles(list, 1 / 60, 375, 667); // ≈2.17s
     return alive === 0;
+  })());
+
+/* ===== 34. 1.4.2 彩带喷高（初速 2.0+0.6·屏高、阻力 0.975）===== */
+// 实跑仿真：390×800 画布上，纸片最高点的中位数应达到屏高 55% 以上（旧参数约 37%），且不冲出顶部
+assert('1.4.2 confetti：喷射高度达标（最高点中位 ≥ 屏高 55%、最高 ≤ 100%）',
+  (() => {
+    const W = 390, H = 800, dt = 1 / 60;
+    const parts = cf.createBurst(W, H, 90);
+    const mins = parts.map(() => H);
+    for (let t = 0; t < 2.2; t += dt) {
+      cf.stepParticles(parts, dt, W, H);
+      parts.forEach((p, i) => { if (p.y < mins[i]) mins[i] = p.y; });
+    }
+    const pct = mins.map(y => (H - y) / H * 100).sort((a, b) => a - b);
+    return pct[45] >= 55 && pct[89] <= 100;
   })());
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
