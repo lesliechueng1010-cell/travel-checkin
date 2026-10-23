@@ -53,7 +53,7 @@ export const CITY_PHOTOS = {
   '桂林': { slug: 'guilin', scene: '象鼻山夜景', credit: '摄影：N509FZ · CC BY-SA 4.0 · Wikimedia Commons' },
   '贵阳': { slug: 'guiyang', scene: '甲秀楼夜景', credit: '摄影：FN-082 · CC BY-SA 4.0 · Wikimedia Commons' },
   '洛阳': { slug: 'luoyang', scene: '龙门石窟', credit: '摄影：Roci xu · CC BY-SA 4.0 · Wikimedia Commons' },
-  '扬州': { slug: 'yangzhou', scene: '瘦西湖五亭桥', credit: '摄影：江上清风1961 · CC BY 3.0 · Wikimedia Commons' }
+  '扬州': { slug: 'yangzhou', scene: '瘦西湖五亭桥', credit: '用户供图' }
 };
 
 export default { PHOTO_BASE, PHOTO_EXT, CITY_PHOTOS };
