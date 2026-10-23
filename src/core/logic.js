@@ -121,3 +121,64 @@ export function kmLabel(mode) {
 }
 
 export function fmtKm(km) { return km >= 10000 ? (km / 10000).toFixed(1) + ' 万 km' : km + ' km'; }
+
+/* ============================================================
+ * 1.4.0 想去页空状态：正当时令 / 抽卡机
+ * 纯函数，全部可在 Node 无头测试（不依赖 uni / DOM）
+ * ============================================================ */
+
+/** 单个季节段落是否命中某月；无法解析返回 false */
+function seasonSegmentMatch(seg, month) {
+  const t = String(seg || '').trim();
+  if (!t) return false;
+  const crossYear = /次年|翌年|跨年/.test(t);
+  const nums = (t.match(/\d{1,2}/g) || [])
+    .map(Number)
+    .filter(n => n >= 1 && n <= 12);
+  if (!nums.length) return false;
+  if (nums.length === 1) return nums[0] === month;
+  const a = nums[0], b = nums[1];
+  // 明确「次年」或起点大于终点，视为跨年区间（如 10-4 月、12-2 月）
+  if (crossYear || a > b) return month >= a || month <= b;
+  return month >= a && month <= b;
+}
+
+/**
+ * 攻略 season 字段是否覆盖某月。
+ * 支持：区间「3-5月」、单月「6月」、跨年「10-4月 / 12-2月 / 10月-次年4月」、
+ *       恒匹配「全年 / 四季皆宜」；括号补充说明里的月份不参与匹配；无法解析 → false。
+ */
+export function seasonMatch(seasonStr, month) {
+  if (typeof seasonStr !== 'string') return false;
+  const m = Number(month);
+  if (!Number.isFinite(m) || m < 1 || m > 12) return false;
+  const s = seasonStr.trim();
+  if (!s) return false;
+  if (/全年|四季皆宜|四季|全年皆宜/.test(s)) return true;
+  // 去掉括号（中英文），避免「（菊花花期在10-11月）」这类说明里的月份被误算
+  const cleaned = s.replace(/[（(][^）)]*[）)]/g, '');
+  const parts = cleaned.split(/[、，,；;]/).map(x => x.trim()).filter(Boolean);
+  return parts.some(p => seasonSegmentMatch(p, m));
+}
+
+/**
+ * 抽卡池：未打卡城市名数组。
+ * 优先只放有攻略的 99 城；仅当这 99 城全部打卡后，才扩到全部未打卡城市。
+ */
+export function drawPool(visitedMap = {}) {
+  const visited = visitedMap || {};
+  const guideUnvisited = Object.keys(GUIDES).filter(n => !visited[n]);
+  if (guideUnvisited.length) return guideUnvisited;
+  return CITIES.filter(c => !visited[c.name]).map(c => c.name);
+}
+
+/**
+ * 正当时令：GUIDES 中 seasonMatch 为真且未打卡的城市名，按数据顺序取前 n（默认 10）。
+ */
+export function seasonalCities(month, visitedMap = {}, n = 10) {
+  const visited = visitedMap || {};
+  return Object.keys(GUIDES)
+    .filter(name => !visited[name] && seasonMatch(GUIDES[name].season, month))
+    .slice(0, n);
+}
+

@@ -519,7 +519,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.3.5 / 135', manifestSrc.versionName === '1.3.5' && manifestSrc.versionCode === '135');
+assert('版本：1.4.0 / 140', manifestSrc.versionName === '1.4.0' && manifestSrc.versionCode === '140');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -774,5 +774,88 @@ assert('1.3.3 store：模块顶层自启 load + migrate，且在 export default 
   /^migrate\(\);\s*$/m.test(readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8')) &&
   readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8').indexOf('load();') <
   readFileSync(new URL('../src/core/store.js', import.meta.url), 'utf8').indexOf('export default {'));
+
+/* ===== 32. 1.4.0 空状态补内容：环线模板 / 抽卡机 / 正当时令 / 彩带 ===== */
+const routes = await import('../src/data/routes.js');
+
+// 环线模板：4 条、城市名全部 findCity 命中
+assert('1.4.0 routes：4 条环线模板，城市名全部 findCity 命中',
+  Array.isArray(routes.ROUTE_TEMPLATES) && routes.ROUTE_TEMPLATES.length === 4 &&
+  routes.ROUTE_TEMPLATES.every(r => Array.isArray(r.cities) && r.cities.length >= 4 &&
+    r.cities.every(n => !!findCity(n))),
+  JSON.stringify(routes.ROUTE_TEMPLATES.map(r => r.name)));
+assert('1.4.0 routes：每条含名称 / 描述 / 城市序列',
+  routes.ROUTE_TEMPLATES.every(r => typeof r.name === 'string' && r.name &&
+    typeof r.desc === 'string' && r.desc && Array.isArray(r.cities)));
+
+// seasonMatch 五种用例（区间 / 单月 / 跨年 / 全年 / 无法解析）+ 括号外泄
+assert('1.4.0 seasonMatch：区间（3-5月、9-11月）',
+  logic.seasonMatch('3-5月、9-11月', 4) === true &&
+  logic.seasonMatch('3-5月、9-11月', 10) === true &&
+  logic.seasonMatch('3-5月、9-11月', 7) === false);
+assert('1.4.0 seasonMatch：单月（6月）',
+  logic.seasonMatch('6月', 6) === true && logic.seasonMatch('6月', 5) === false);
+assert('1.4.0 seasonMatch：跨年区间（10-4月 / 12-2月）',
+  logic.seasonMatch('10-4月', 12) === true && logic.seasonMatch('10-4月', 2) === true &&
+  logic.seasonMatch('10-4月', 7) === false &&
+  logic.seasonMatch('12-2月(冰雪)', 1) === true && logic.seasonMatch('12-2月(冰雪)', 6) === false);
+assert('1.4.0 seasonMatch：全年 / 四季皆宜恒匹配',
+  logic.seasonMatch('全年', 1) === true && logic.seasonMatch('四季皆宜', 7) === true);
+assert('1.4.0 seasonMatch：无法解析返回 false',
+  logic.seasonMatch('内容补充中', 5) === false && logic.seasonMatch('', 5) === false &&
+  logic.seasonMatch(null, 5) === false);
+assert('1.4.0 seasonMatch：括号里的无关月份不参与匹配',
+  logic.seasonMatch('4-5月（菊花花期在10-11月）', 10) === false &&
+  logic.seasonMatch('4-5月（菊花花期在10-11月）', 4) === true);
+
+// drawPool：排除已打卡、99 城优先，全打卡后才扩池
+const drawP = logic.drawPool({ '北京': {} });
+assert('1.4.0 drawPool：排除已打卡且只放有攻略的 99 城',
+  Array.isArray(drawP) && !drawP.includes('北京') &&
+  drawP.length === Object.keys(guides.GUIDES).length - 1 &&
+  drawP.every(n => !!guides.GUIDES[n]),
+  `pool=${drawP.length}`);
+assert('1.4.0 drawPool：99 城全打卡后才扩到全部未打卡城市',
+  (() => {
+    const all = {};
+    Object.keys(guides.GUIDES).forEach(n => { all[n] = {}; });
+    const p = logic.drawPool(all);
+    return p.length > 0 && p.every(n => !guides.GUIDES[n]) && p.every(n => !all[n]);
+  })());
+
+// seasonalCities：按月过滤
+const oct = logic.seasonalCities(10, {});
+assert('1.4.0 seasonalCities：10 月含北京，只取前 10 且有攻略',
+  oct.includes('北京') && oct.length > 0 && oct.length <= 10 && oct.every(n => !!guides.GUIDES[n]),
+  `n=${oct.length}`);
+assert('1.4.0 seasonalCities：已打卡城市被排除',
+  !logic.seasonalCities(10, { '北京': {} }).includes('北京'));
+assert('1.4.0 seasonalCities：返回城市均满足当月匹配',
+  oct.every(n => logic.seasonMatch(guides.GUIDES[n].season, 10)));
+
+// confetti 工具
+const confettiSrc = readFileSync(new URL('../src/utils/confetti.js', import.meta.url), 'utf8');
+assert('1.4.0 confetti：工具存在且含清理逻辑',
+  /export function clearConfetti/.test(confettiSrc) && /clearTimeout/.test(confettiSrc) &&
+  /export function playConfetti/.test(confettiSrc));
+
+// 想去页：抽卡机 + 正当时令 + 彩带触发 + 清理
+const wishSrc = readFileSync(new URL('../src/pages/wishlist/wishlist.vue', import.meta.url), 'utf8');
+assert('1.4.0 想去页：抽卡机与正当时令关键结构',
+  wishSrc.includes('抽一座城') && wishSrc.includes('正当时令') &&
+  /seasonalCities|drawPool/.test(wishSrc));
+assert('1.4.0 想去页：抽卡定格处触发彩带，且 onHide/onUnload 清理',
+  /playConfetti\(/.test(wishSrc) && /confettiOn/.test(wishSrc) &&
+  /clearConfetti\(/.test(wishSrc) && /clearInterval\(/.test(wishSrc) &&
+  /onHide\s*\(/.test(wishSrc) && /onUnload\s*\(/.test(wishSrc));
+assert('1.4.0 想去页：非空时底部紧凑入口复用抽卡',
+  /draw-entry/.test(wishSrc) && /list\.length\s*&&\s*!drawOpen/.test(wishSrc) && /openDraw/.test(wishSrc));
+
+// 行程页：模板区 + 一键载入 + 想去一键成行
+const tripSrc2 = readFileSync(new URL('../src/pages/trip/trip.vue', import.meta.url), 'utf8');
+assert('1.4.0 行程页：环线模板区 + 一键载入',
+  /ROUTE_TEMPLATES/.test(tripSrc2) && tripSrc2.includes('一键载入') && /loadTemplate\s*\(/.test(tripSrc2));
+assert('1.4.0 行程页：想去一键成行（wishlist≥2 显示）',
+  tripSrc2.includes('一键串成环线') && /wishlist\.length\s*>=\s*2/.test(tripSrc2) && /loadWishList\s*\(/.test(tripSrc2));
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');

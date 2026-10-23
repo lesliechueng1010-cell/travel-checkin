@@ -34,6 +34,33 @@
         <button class="btn primary" @tap="addPending">把「{{ pendingCity }}」加入行程</button>
       </view>
 
+      <!-- 1.4.0 空状态补内容：想去一键成行 + 经典环线模板（有城后自动隐藏） -->
+      <view v-if="!cities.length" class="empty-extras">
+        <view class="wish-banner" v-if="wishlist.length >= 2" @tap="loadWishList">
+          <view class="wb-body">
+            <text class="wb-title">你的想去清单有 {{ wishlist.length }} 座城</text>
+            <text class="wb-desc">一键串成环线（{{ hasLoc ? '按距离由近到远' : '按添加顺序' }}）</text>
+          </view>
+          <text class="wb-go">一键成行 ›</text>
+        </view>
+
+        <view class="route-tpl">
+          <view class="tpl-head">
+            <text class="tpl-title">经典环线模板</text>
+            <text class="tpl-sub">载入后可继续增删、再计算</text>
+          </view>
+          <view class="tpl-card" v-for="r in routeCards" :key="r.id">
+            <view class="tpl-top">
+              <text class="tpl-name">{{ r.name }}</text>
+              <text class="tpl-meta">{{ r.count }} 座城 · 建议约 {{ r.days }} 天</text>
+            </view>
+            <text class="tpl-desc">{{ r.desc }}</text>
+            <text class="tpl-seq">{{ r.cities.join(' → ') }}</text>
+            <button class="btn sm primary tpl-load" @tap="loadTemplate(r)">一键载入</button>
+          </view>
+        </view>
+      </view>
+
       <view class="divider"></view>
       <button class="btn primary" :disabled="cities.length < 2" @tap="compute">
         计算环线里程与建议天数
@@ -130,7 +157,8 @@
 <script>
 import store from '../../core/store.js';
 import { CITIES, findCity, searchCity, PROVINCES, citiesOfProv } from '../../data/cities.js';
-import { tripMileage, suggestDays, kmLabel } from '../../core/logic.js';
+import { tripMileage, suggestDays, kmLabel, haversine } from '../../core/logic.js';
+import { ROUTE_TEMPLATES } from '../../data/routes.js';
 import tmap from '../../utils/tmap.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
 
@@ -146,6 +174,8 @@ export default {
       pickKw: '',
       draftList: [],
       wishCities: [],
+      wishlist: [],
+      hasLoc: false,
       provinces: PROVINCES,
       DISCLAIMER: SAFETY_DISCLAIMER
     };
@@ -163,10 +193,22 @@ export default {
       // 纯本地匹配：城市名 / 所属省份名；无结果再走别名（如「香格里拉」→ 迪庆）
       const direct = CITIES.filter(c => c.name.includes(kw) || c.prov.includes(kw));
       return direct.length ? direct : searchCity(kw);
+    },
+    // 1.4.0 环线模板卡：天数用 suggestDays 本地估算（卡面不显示里程数字）
+    routeCards() {
+      return ROUTE_TEMPLATES.map(r => {
+        const cs = r.cities.map(n => findCity(n)).filter(Boolean);
+        let km = 0;
+        for (let i = 0; i < cs.length - 1; i++) km += haversine(cs[i], cs[i + 1]);
+        return { ...r, count: cs.length, days: suggestDays(cs, km).total };
+      });
     }
   },
   onShow() {
     this.saved = store.get().trips || [];
+    const s = store.get();
+    this.wishlist = s.wishlist || [];
+    this.hasLoc = !!s.lastLoc;
     const pending = uni.getStorageSync('tf_trip_pending');
     if (pending) { this.pendingCity = pending; uni.removeStorageSync('tf_trip_pending'); }
   },
@@ -190,6 +232,25 @@ export default {
       this.cities = this.draftList.map(n => findCity(n)).filter(Boolean);
       this.result = null;
       this.pickerOpen = false;
+    },
+    /* 1.4.0：一键载入环线模板 —— 与选城确认同一落位路径（设 cities + 旧结果作废） */
+    loadTemplate(r) {
+      this.cities = r.cities.map(n => findCity(n)).filter(Boolean);
+      this.result = null;
+      this.tripName = r.name;
+      uni.showToast({ title: '已载入' + r.name + '，可点计算或继续增删', icon: 'none' });
+    },
+    /* 1.4.0：按想去清单生成环线（有定位按距离由近到远，无定位按添加顺序） */
+    loadWishList() {
+      const s = store.get();
+      const loc = s.lastLoc;
+      let arr = (s.wishlist || []).map(n => findCity(n)).filter(Boolean);
+      if (loc) arr = arr.map(c => ({ ...c, dist: haversine(loc, c) })).sort((a, b) => a.dist - b.dist);
+      if (arr.length < 2) return;
+      this.cities = arr;
+      this.result = null;
+      this.tripName = '想去清单环线';
+      uni.showToast({ title: '已按想去清单生成环线', icon: 'none' });
     },
     citiesOfProv(p) { return citiesOfProv(p); },
     addPending() {
@@ -331,4 +392,34 @@ export default {
 }
 .pick-check.on { color: #D9B36A; }
 .sheet-done { margin-top: 20rpx; }
+
+/* 1.4.0 空状态补充：想去一键成行 + 经典环线模板（沿用深海蓝玻璃 + 香槟金） */
+.empty-extras { margin-top: 22rpx; }
+.wish-banner {
+  display: flex; align-items: center; gap: 18rpx;
+  padding: 24rpx 26rpx; margin-bottom: 18rpx;
+  border-radius: 24rpx;
+  background: rgba(217, 179, 106, 0.10);
+  border: 1rpx solid rgba(217, 179, 106, 0.34);
+}
+.wb-body { flex: 1; display: flex; flex-direction: column; }
+.wb-title { font-size: 28rpx; color: #F2EDE3; font-weight: 600; }
+.wb-desc { font-size: 22rpx; color: rgba(242, 237, 227, 0.55); margin-top: 6rpx; }
+.wb-go { font-size: 26rpx; color: #D9B36A; font-weight: 600; }
+.route-tpl { margin-top: 6rpx; }
+.tpl-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 4rpx 14rpx; }
+.tpl-title { font-size: 28rpx; font-weight: 700; color: #F2EDE3; }
+.tpl-sub { font-size: 22rpx; color: rgba(242, 237, 227, 0.45); }
+.tpl-card {
+  padding: 22rpx 24rpx; margin-bottom: 14rpx;
+  border-radius: 24rpx;
+  background: rgba(245, 240, 230, 0.05);
+  border: 1rpx solid rgba(245, 240, 230, 0.10);
+}
+.tpl-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12rpx; }
+.tpl-name { font-size: 29rpx; font-weight: 600; color: #F2EDE3; }
+.tpl-meta { font-size: 22rpx; color: #D9B36A; white-space: nowrap; }
+.tpl-desc { display: block; font-size: 23rpx; color: rgba(242, 237, 227, 0.6); margin-top: 8rpx; }
+.tpl-seq { display: block; font-size: 23rpx; color: rgba(242, 237, 227, 0.8); margin-top: 8rpx; }
+.tpl-load { margin-top: 16rpx; }
 </style>
