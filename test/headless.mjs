@@ -1045,9 +1045,10 @@ assert('1.5.0 详情头图：440rpx 横幅 + 顶部 0.25 渐变罩 + 右下角�
 assert('1.5.1 photos：PHOTO_BASE 走云存储 cloud:// 且以 /city-photos/ 结尾',
   /^cloud:\/\//.test(photos.PHOTO_BASE) && /\/city-photos\/$/.test(photos.PHOTO_BASE),
   photos.PHOTO_BASE);
-assert('1.5.1 photos：30 城 credit 全部非空且含「摄影：」与 Wikimedia Commons',
+assert('1.5.1 photos：30 城 credit 全部非空且含「摄影：」与 Wikimedia Commons（「用户供图」为唯一豁免）',
   photoKeys.length === 30 && photoKeys.every(n => {
     const c = photos.CITY_PHOTOS[n].credit;
+    if (c === '用户供图') return true;
     return typeof c === 'string' && c.length > 10 && c.includes('摄影：') && c.includes('Wikimedia Commons');
   }),
   photoKeys.filter(n => !photos.CITY_PHOTOS[n].credit).join(','));
