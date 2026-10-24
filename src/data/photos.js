@@ -10,7 +10,11 @@
  * 2. 把 PHOTO_BASE 填成云存储前缀（如 'cloud://travel-checkin-d6g1yag6s4ceb9790.xxxx/city-photos/'）；
  * 3. 城市详情页在 PHOTO_BASE 非空且本表有该城市时才显示照片横幅，否则保持原渐变头部。
  *
- * 未填 PHOTO_BASE 时（当前状态）前端不发起任何图片请求，不会白屏、不会报错。
+ * 1.6.1 压缩图：scripts/compress-photos.mjs 把原图压成 750px WebP（q80，单张 ≈50KB），
+ * 上传到 city-photos-lite/；云函数 photoUrl 默认优先换压缩图链接，取不到才回退原图。
+ * 换图后把 PHOTO_VER +1，本地已下载的旧图与索引整批失效。
+ *
+ * 未填 PHOTO_BASE 时前端不发起任何图片请求，不会白屏、不会报错。
  */
 
 /** 云存储前缀（city-photos/ 目录，图片一律远程加载，代码包内零图片） */
@@ -18,6 +22,12 @@ export const PHOTO_BASE = 'cloud://travel-checkin-d6g1yag6s4ceb9790.7472-travel-
 
 /** 头像文件扩展名 */
 export const PHOTO_EXT = '.jpg';
+
+/**
+ * 头图缓存版本号（1.6.1）
+ * 换图后 +1：本地缓存索引与已下载文件都按版本号命名，+1 即整批失效，无需手动清缓存。
+ */
+export const PHOTO_VER = 1;
 
 /**
  * 首批 30 城实拍头图
@@ -56,4 +66,4 @@ export const CITY_PHOTOS = {
   '扬州': { slug: 'yangzhou', scene: '瘦西湖五亭桥', credit: '用户供图' }
 };
 
-export default { PHOTO_BASE, PHOTO_EXT, CITY_PHOTOS };
+export default { PHOTO_BASE, PHOTO_EXT, PHOTO_VER, CITY_PHOTOS };

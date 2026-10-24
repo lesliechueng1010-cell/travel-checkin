@@ -60,12 +60,45 @@ export async function fetchGuide(cityName) {
 /**
  * 头图临时链接：云存储权限为「仅创建者可读写」时小程序端直读 cloud:// 被拒，
  * 由云函数（服务端不受该权限限制）换取临时 HTTPS 链接。失败返回 null（前端回退渐变）。
+ * size：'lite'（默认，city-photos-lite/ 压缩图）| 'orig'（原图）。
  */
-export async function fetchPhotoUrl(fileID) {
+export async function fetchPhotoUrl(fileID, size) {
+  const info = await fetchPhotoInfo(fileID, size);
+  return info ? info.url : null;
+}
+
+/** 同 fetchPhotoUrl，但连命中档位一起返回：{ url, size: 'lite' | 'orig' }（落盘时按档位定扩展名） */
+export async function fetchPhotoInfo(fileID, size) {
   if (!isCloud() || !fileID) return null;
   try {
-    const r = await cloudCall('tfapi', { action: 'photoUrl', fileID });
-    return r.url || null;
+    const r = await cloudCall('tfapi', { action: 'photoUrl', fileID, size: size || 'lite' });
+    if (!r.url) return null;
+    return { url: r.url, size: r.size === 'orig' ? 'orig' : 'lite', expireAt: r.expireAt || 0 };
+  } catch (e) { return null; }
+}
+
+/**
+ * 批量换头图链接（1.6.1）：一次传入多个 fileID，一次拿回全部临时链接，供预取/预下载用。
+ * 返回 { expireAt, urls: { fileID: url }, sizes: { fileID: 'lite'|'orig' } }；
+ * 取不到的条目不在 urls 里，调用方逐城回退。云不可用或失败返回 null。
+ */
+export async function fetchPhotoUrls(fileIDs, size) {
+  if (!isCloud() || !Array.isArray(fileIDs) || !fileIDs.length) return null;
+  try {
+    const r = await cloudCall('tfapi', {
+      action: 'photoUrls',
+      fileIDs,
+      size: size || 'lite'
+    });
+    const urls = {};
+    const sizes = {};
+    (r.items || []).forEach(it => {
+      if (it && it.fileID && it.url) {
+        urls[it.fileID] = it.url;
+        sizes[it.fileID] = it.size === 'orig' ? 'orig' : 'lite';
+      }
+    });
+    return { expireAt: r.expireAt || 0, urls, sizes };
   } catch (e) { return null; }
 }
 
@@ -90,4 +123,8 @@ export async function pullProfile() {
   } catch (e) { return null; }
 }
 
-export default { isCloud, login, pull, push, fetchGuide, fetchPhotoUrl, pushProfile, pullProfile };
+export default {
+  isCloud, login, pull, push, fetchGuide,
+  fetchPhotoUrl, fetchPhotoInfo, fetchPhotoUrls,
+  pushProfile, pullProfile
+};

@@ -89,8 +89,12 @@
 import store from '../../core/store.js';
 import { CITIES, citiesOfProv, searchCity, findCity } from '../../data/cities.js';
 import { locateCity } from '../../core/logic.js';
+import photoCache from '../../utils/photo-cache.js';
 
 const SHEET_KEY = 'tf.mapSheetOpen';
+
+/* 1.6.1 头图预取定时器：延迟 2 秒避开地图页首屏，只排一次 */
+let photoPrefetchTimer = 0;
 
 const ICON = {
   visited: '/static/icons/dot_green.png',   // 香槟金实心点（已打卡）
@@ -181,7 +185,22 @@ export default {
     this.refresh();
     this.tryLocate();
   },
+  onReady() {
+    this.schedulePhotoPrefetch();
+  },
   methods: {
+    /**
+     * 1.6.1 头图预取：进地图页 2 秒后（首屏与定位都已完成）批量把 30 城临时链接换回来，
+     * 点开城市就不再等云函数；随后分批预下载进本地缓存（热门优先、每批 3 张）。
+     * boost() 自身幂等、失败静默，这里只保证不重复排定时器。
+     */
+    schedulePhotoPrefetch() {
+      if (photoPrefetchTimer) return;
+      photoPrefetchTimer = setTimeout(() => {
+        photoPrefetchTimer = 0;
+        photoCache.boost().catch(() => {});
+      }, 2000);
+    },
     toggleSheet() {
       this.sheetOpen = !this.sheetOpen;
       try { uni.setStorageSync(SHEET_KEY, this.sheetOpen ? '1' : '0'); } catch (e) {}

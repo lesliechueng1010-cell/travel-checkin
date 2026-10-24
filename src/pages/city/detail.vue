@@ -1,12 +1,15 @@
 <template>
   <view class="page">
-    <!-- 封面区 · 有实拍图时照片横幅（云存储远程加载），否则保持渐变头部 -->
+    <!-- 封面区 · 有实拍图时照片横幅（本地缓存优先，远程加载兜底），否则保持渐变头部。
+         图未到位时保留 440rpx 横幅区，显示深海蓝渐变 + 城市名占位，图到位后淡入（不白屏、不跳版） -->
     <view class="city-cover" :class="{ 'has-photo': showPhoto }" :style="coverStyle">
       <image
-        v-if="showPhoto"
+        v-if="showPhoto && photoSrc"
         class="cover-photo"
+        :class="{ in: photoReady }"
         :src="photoSrc"
         mode="aspectFill"
+        @load="onPhotoLoad"
         @error="onPhotoError"
       />
       <view v-if="showPhoto" class="cover-scrim"></view>
@@ -183,6 +186,7 @@ import { haversine, kmLabel } from '../../core/logic.js';
 import { openNavMenu } from '../../utils/nav.js';
 import tmap, { mergeRoutePoints } from '../../utils/tmap.js';
 import cache from '../../utils/cache.js';
+import photoCache from '../../utils/photo-cache.js';
 import api from '../../api/index.js';
 import { PHOTO_BASE, PHOTO_EXT, CITY_PHOTOS } from '../../data/photos.js';
 import { SAFETY_DISCLAIMER } from '../../config.js';
@@ -208,6 +212,8 @@ export default {
       foodHint: '',
       routePreview: null,
       photoFailed: false,
+      photoReady: false,
+      photoRetried: false,
       photoSrc: '',
       DISCLAIMER: SAFETY_DISCLAIMER
     };
@@ -237,28 +243,54 @@ export default {
     photoMeta() {
       return CITY_PHOTOS[this.city.name] || null;
     },
-    /** PHOTO_BASE 为空（未传图）或该城无图时不拼 URL，也不发任何图片请求 */
-    photoUrl() {
+    /** 云存储 fileID（PHOTO_BASE + slug + 扩展名）；PHOTO_BASE 为空或该城无图时返回空，不发任何请求 */
+    photoFileID() {
       const m = this.photoMeta;
       if (!PHOTO_BASE || !m || !m.slug) return '';
       return PHOTO_BASE + m.slug + PHOTO_EXT;
     },
+    /** 该城是否配有头图：有就先占住横幅位显示占位，避免图到了再跳版 */
+    expectPhoto() {
+      return !!this.photoFileID;
+    },
     showPhoto() {
-      return !!this.photoSrc && !this.photoFailed;
+      return this.expectPhoto && !this.photoFailed;
     },
   },
   methods: {
-    /** 图片加载失败：回退渐变头部，不白屏不报错 */
+    /** 图片加载完成：淡入（本地缓存命中时也走这里，保持过渡一致） */
+    onPhotoLoad() {
+      this.photoReady = true;
+    },
+    /**
+     * 图片加载失败：先作废这条缓存，再换回**原图**链接重试一次
+     * （覆盖「压缩图文件损坏」和「个别机型不认 WebP」两种情况）；
+     * 仍失败则回退渐变头部，不白屏不报错。
+     */
     onPhotoError() {
+      if (!this.photoRetried && this.photoFileID) {
+        this.photoRetried = true;
+        photoCache.invalidate(this.city.name);
+        photoCache.getUrl(this.city.name, this.photoFileID, 'orig').then(url => {
+          if (!url || url === this.photoSrc) { this.photoFailed = true; return; }
+          this.photoSrc = url;
+        }, () => { this.photoFailed = true; });
+        return;
+      }
       this.photoFailed = true;
     },
-    /** 头图取链：云存储私有权限下直读 cloud:// 被拒，改走云函数换临时 HTTPS 链接 */
+    /**
+     * 头图取图（1.6.1）：本地缓存索引（城市 + PHOTO_VER）命中且文件在 → 直接显示；
+     * 未命中 → 临时链接 downloadFile → saveFile 落盘 → 写索引 → 显示；
+     * 落盘失败（如未配 downloadFile 合法域名）→ 降级为临时链接直出，不影响显示。
+     */
     async resolvePhoto() {
-      const fid = this.photoUrl;
+      const fid = this.photoFileID;
       if (!fid) return;
-      const url = await api.fetchPhotoUrl(fid);
-      if (url) this.photoSrc = url;
-      else this.photoFailed = true;
+      const r = await photoCache.resolve(this.city.name, fid);
+      if (!r || !r.src) { this.photoFailed = true; return; }
+      this.photoSrc = r.src;
+      if (r.cached) this.photoReady = true;
     },
     async loadGuide() {
       // 离线优先：缓存 > 云数据库 > 内置库 > 通用模板；浏览后自动缓存
@@ -417,7 +449,11 @@ export default {
 .cover-photo {
   position: absolute; left: 0; top: 0;
   width: 100%; height: 440rpx;
+  /* 图未到位时透出下面的深海蓝渐变 + 城市名（占位），加载完成 .in 淡入 */
+  opacity: 0;
+  transition: opacity 0.36s ease;
 }
+.cover-photo.in { opacity: 1; }
 .cover-scrim {
   position: absolute; left: 0; top: 0;
   width: 100%; height: 440rpx;

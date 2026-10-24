@@ -526,7 +526,7 @@ assert('地图标记：全国视图只渲染已打卡城市（无文字气泡）
   !/display:\s*'ALWAYS'/.test(mapSrc.replace(/\n/g, ' ')));
 assert('地图标记：省视图未打卡城市不挂文字', /if \(done\) \{\s*\n\s*m\.callout/.test(mapSrc));
 const manifestSrc = JSON.parse(readFileSync(new URL('../src/manifest.json', import.meta.url), 'utf8'));
-assert('版本：1.6.0 / 160', manifestSrc.versionName === '1.6.0' && manifestSrc.versionCode === '160');
+assert('版本：1.6.1 / 161', manifestSrc.versionName === '1.6.1' && manifestSrc.versionCode === '161');
 assert('配置：cloudEnv 已填入云开发环境 ID', CONFIG.cloudEnv === 'travel-checkin-d6g1yag6s4ceb9790',
   `cloudEnv=${JSON.stringify(CONFIG.cloudEnv)}`);
 
@@ -1355,5 +1355,268 @@ assert('1.6.0 行程页：天数继续吃总 km（自动含回程）、存档结
   /suggestDays\(this\.cities, m\.km\)/.test(tripSrc160) &&
   /store\.saveTrip\(\{ id: 'T' \+ Date\.now\(\)/.test(tripSrc160) &&
   /ROUTE_TEMPLATES/.test(tripSrc160));
+
+/* ===== 41. 1.6.1：头图压缩图 + 本地文件缓存 + 链接预取 ===== */
+
+// 41.1 版本号常量与索引键（key = 城市 + PHOTO_VER）
+assert('1.6.1 PHOTO_VER：从 1 开始的整数，缓存索引键带版本号',
+  Number.isInteger(photos.PHOTO_VER) && photos.PHOTO_VER >= 1);
+
+// 41.2 tfapi：size 默认 lite、lite 目录与扩展名、取不到回退原图、批量动作
+assert('1.6.1 tfapi：photoUrl 支持 size 参数且默认 lite（city-photos-lite/ + .webp）',
+  /normalizeSize\(v\)[\s\S]{0,120}=== 'orig' \? 'orig' : 'lite'/.test(tfapiSrc) &&
+  /PHOTO_DIR = \{ lite: '\/city-photos-lite\/', orig: '\/city-photos\/' \}/.test(tfapiSrc) &&
+  /PHOTO_EXT = \{ lite: '\.webp', orig: '\.jpg' \}/.test(tfapiSrc) &&
+  /resolvePhoto\(fileID, normalizeSize\(event\.size\)\)/.test(tfapiSrc));
+assert('1.6.1 tfapi：lite 取不到时回退原图（单个与批量都是先整批 lite 再整批 orig）',
+  /const liteMap = await tempUrlMap\(\[liteId\]\);[\s\S]{0,220}return origMap\[origId\]/.test(tfapiSrc) &&
+  /const liteMap = await tempUrlMap\(liteIds\.filter\(Boolean\)\);[\s\S]{0,400}const origMap = await tempUrlMap\(origIds\.filter\(Boolean\)\)/.test(tfapiSrc));
+assert('1.6.1 tfapi：新增 photoUrls 批量动作，一次返回全部链接 + 过期时间',
+  /action === 'photoUrls'/.test(tfapiSrc) && /fileIDs/.test(tfapiSrc) &&
+  /expireAt: Date\.now\(\) \+ PHOTO_TTL_MS/.test(tfapiSrc) &&
+  /ids\.map\(\(id, i\) => \(\{/.test(tfapiSrc));
+
+// 41.3 api：单条带档位、批量入口
+assert('1.6.1 api：fetchPhotoInfo 回传档位、fetchPhotoUrls 批量并带 sizes',
+  /export async function fetchPhotoInfo/.test(apiSrc) && /size: r\.size === 'orig' \? 'orig' : 'lite'/.test(apiSrc) &&
+  /export async function fetchPhotoUrls/.test(apiSrc) && /action: 'photoUrls'/.test(apiSrc) &&
+  /sizes\[it\.fileID\] = it\.size/.test(apiSrc));
+
+// 41.4 纯逻辑：LRU 淘汰名单 + 索引条目有效性
+const pc = (await import('../src/utils/photo-cache.js')).default;
+assert('1.6.1 缓存索引键 = tf_photo_idx_v{PHOTO_VER}，上限 30MB',
+  pc.IDX_KEY === 'tf_photo_idx_v' + photos.PHOTO_VER && pc.MAX_BYTES === 30 * 1024 * 1024,
+  pc.IDX_KEY);
+const lruItems = {
+  A: { s: 12 * 1024 * 1024, t: 3 },   // 最近用过
+  B: { s: 12 * 1024 * 1024, t: 1 },   // 最久没用
+  C: { s: 12 * 1024 * 1024, t: 2 }
+};
+assert('1.6.1 LRU：超 30MB 时按最近使用时间升序淘汰，淘汰到不超限为止',
+  JSON.stringify(pc.pickEvict(lruItems, 30 * 1024 * 1024)) === JSON.stringify(['B']) &&
+  pc.pickEvict(lruItems, 36 * 1024 * 1024).length === 0 &&
+  pc.pickEvict(lruItems, 20 * 1024 * 1024).join(',') === 'B,C' &&
+  pc.pickEvict({}, 0).length === 0,
+  JSON.stringify(pc.pickEvict(lruItems, 20 * 1024 * 1024)));
+assert('1.6.1 索引条目：版本不一致 / 缺路径 / 无大小 一律视为不可用',
+  pc.entryUsable({ p: '/x', v: 1, s: 10 }, 1) &&
+  !pc.entryUsable({ p: '/x', v: 0, s: 10 }, 1) &&
+  !pc.entryUsable({ p: '', v: 1, s: 10 }, 1) &&
+  !pc.entryUsable(null, 1));
+
+// 41.5 fileID 拼装 + 预取顺序（热门优先，30 城全覆盖）
+assert('1.6.1 fileIdOf：PHOTO_BASE + slug + .jpg，无图城市返回空串',
+  pc.fileIdOf('重庆') === photos.PHOTO_BASE + 'chongqing' + photos.PHOTO_EXT &&
+  pc.fileIdOf('不存在市') === '');
+const order1 = pc.orderCities();
+assert('1.6.1 预取顺序：30 城全在、无重复、热门城市排最前',
+  order1.length === 30 && new Set(order1).size === 30 &&
+  order1[0] === '重庆' && order1[1] === '成都' &&
+  pc.HOT_ORDER.every(c => pc.HOT_ORDER.indexOf(c) < order1.length &&
+    order1.indexOf(c) < pc.HOT_ORDER.length),
+  order1.slice(0, 5).join(','));
+
+// 41.6 端到端（假文件系统 + 假 downloadFile）：二次打开零下载、落盘写索引、LRU 真删文件
+const FILE_STORE = new Map();
+let dlCount = 0;
+let dlSize = 56 * 1024;
+let dlFail = false;
+globalThis.wx = {
+  cloud: null,
+  env: { USER_DATA_PATH: '/usr' },
+  getFileSystemManager: () => ({
+    accessSync(p) { if (!FILE_STORE.has(p)) throw new Error('ENOENT'); },
+    mkdirSync() {},
+    statSync(p) { if (!FILE_STORE.has(p)) throw new Error('ENOENT'); return { size: FILE_STORE.get(p) }; },
+    saveFileSync(o) { FILE_STORE.set(o.dstPath, FILE_STORE.get(o.srcPath) || dlSize); },
+    unlinkSync(p) { FILE_STORE.delete(p); }
+  })
+};
+uni.downloadFile = o => {
+  dlCount++;
+  if (dlFail) { o.fail({ errMsg: 'downloadFile:fail' }); return; }
+  FILE_STORE.set(o.url, dlSize);
+  o.success({ statusCode: 200, tempFilePath: o.url, fileContentLength: dlSize });
+};
+const api0 = (await import('../src/api/index.js')).default;
+api0.fetchPhotoInfo = async fid => ({ url: 'https://cdn/' + String(fid).split('/').pop(), size: 'lite', expireAt: Date.now() + 600000 });
+api0.fetchPhotoUrls = async ids => {
+  const urls = {}; const sizes = {};
+  ids.forEach(id => { urls[id] = 'https://cdn/' + id.split('/').pop(); sizes[id] = 'lite'; });
+  return { expireAt: Date.now() + 600000, urls, sizes };
+};
+
+pc.clearAll(); dlCount = 0;
+const r1 = await pc.resolve('重庆');
+const r2 = await pc.resolve('重庆');
+assert('1.6.1 首次打开：downloadFile 落盘到本地用户目录并写索引',
+  r1.src === '/usr/tf_photo_v1/chongqing.webp' && r1.cached === false && dlCount === 1 &&
+  FILE_STORE.has('/usr/tf_photo_v1/chongqing.webp'),
+  `${r1.src} dl=${dlCount}`);
+assert('1.6.1 二次打开同一城市：直接命中本地文件、零网络请求',
+  r2.src === r1.src && r2.cached === true && dlCount === 1, `cached=${r2.cached} dl=${dlCount}`);
+assert('1.6.1 索引落 Storage 且带版本号（换图 +1 即整批失效）',
+  (() => {
+    const raw = uni.getStorageSync(pc.IDX_KEY);
+    const e = raw && raw.items && raw.items['重庆'];
+    return !!e && e.v === photos.PHOTO_VER && e.p === r1.src && e.s === dlSize && raw.v === photos.PHOTO_VER;
+  })());
+assert('1.6.1 下载失败降级：仍返回临时链接（远程直出），不写索引、不报错',
+  await (async () => {
+    pc.invalidate('成都');
+    const before = pc.stats().count;
+    dlFail = true;
+    const r = await pc.resolve('成都');
+    dlFail = false;
+    return r.src.indexOf('https://cdn/chengdu.jpg') === 0 && r.degraded === true && pc.stats().count === before;
+  })());
+
+// LRU：3 张各 11MB（33MB > 30MB），最久没用的重庆/成都被淘汰，文件真删
+pc.clearAll(); dlSize = 11 * 1024 * 1024; dlCount = 0;
+await pc.resolve('重庆'); await new Promise(r => setTimeout(r, 3));
+await pc.resolve('成都'); await new Promise(r => setTimeout(r, 3));
+await pc.resolve('北京');
+const afterLru = pc.stats();
+assert('1.6.1 LRU：缓存超 30MB 自动淘汰最久未用的文件并同步清索引',
+  afterLru.bytes <= pc.MAX_BYTES && afterLru.count === 2 &&
+  pc.getCached('重庆') === '' && !FILE_STORE.has('/usr/tf_photo_v1/chongqing.webp') &&
+  pc.getCached('北京') !== '',
+  `bytes=${(afterLru.bytes / 1024 / 1024).toFixed(1)}MB count=${afterLru.count}`);
+
+// 预取 + 预下载：一次批量换链，30 城全部进缓存；boost 幂等
+pc.clearAll(); dlSize = 60 * 1024; dlCount = 0;
+api0.fetchPhotoUrls = (ids => {
+  const urls = {}; const sizes = {};
+  ids.forEach(id => { urls[id] = 'https://cdn/' + id.split('/').pop(); sizes[id] = 'lite'; });
+  globalThis.__prefetchCalls = (globalThis.__prefetchCalls || 0) + 1;
+  return Promise.resolve({ expireAt: Date.now() + 600000, urls, sizes });
+});
+const boosted = await pc.boost();
+const again = await pc.boost();
+assert('1.6.1 预取：一次批量接口换回 30 城链接，预下载 30 张进缓存',
+  boosted.urls === 30 && boosted.files === 30 && pc.stats().count === 30 && dlCount === 30,
+  `urls=${boosted.urls} files=${boosted.files} dl=${dlCount}`);
+assert('1.6.1 预取幂等：同一次启动内重复调用不再重复换链/下载',
+  again.urls === 0 && again.files === 0 && globalThis.__prefetchCalls === 1 && dlCount === 30);
+
+// 30 城逐个打开：每城落到自己的文件，互不串图
+pc.clearAll(); dlSize = 60 * 1024; dlCount = 0;
+const mixed = [];
+for (const n of Object.keys(photos.CITY_PHOTOS)) {
+  const r = await pc.resolve(n);
+  const want = '/usr/tf_photo_v1/' + photos.CITY_PHOTOS[n].slug + '.webp';
+  if (r.src !== want) mixed.push(n + '→' + r.src);
+}
+assert('1.6.1 30 城逐个打开：各自命中自己的文件，无串图、无报错',
+  mixed.length === 0 && pc.stats().count === 30 && dlCount === 30,
+  mixed.join(' | '));
+
+// 熔断：连续 3 次下载失败后不再重复尝试（远程直出，不再浪费请求）
+pc.clearAll(); dlCount = 0; dlFail = true;
+await pc.resolve('重庆'); await pc.resolve('成都'); await pc.resolve('北京');
+const dlAfter3 = dlCount;
+const broken = await pc.resolve('上海');
+dlFail = false;
+assert('1.6.1 连续下载失败熔断：3 次后停止尝试，直接返回远程链接（不写索引）',
+  dlAfter3 === 3 && dlCount === 3 && broken.degraded === true && broken.src.indexOf('https://cdn/') === 0 &&
+  pc.stats().count === 0,
+  `dl=${dlCount} src=${broken.src}`);
+
+// 41.7 前端接线：详情页走缓存层 + 占位淡入；地图页延迟 2 秒预取
+assert('1.6.1 详情页：resolvePhoto 走 photoCache.resolve，本地命中直接显示',
+  /photoCache\.resolve\(this\.city\.name, fid\)/.test(detailSrc152) &&
+  /if \(r\.cached\) this\.photoReady = true/.test(detailSrc152) &&
+  /import photoCache from '\.\.\/\.\.\/utils\/photo-cache\.js'/.test(detailSrc152));
+assert('1.6.1 详情页：占位淡入（opacity 过渡 + @load）+ 失败作废缓存重试一次',
+  /\.cover-photo\.in \{ opacity: 1; \}/.test(detailSrc152) &&
+  /transition: opacity 0\.36s ease/.test(detailSrc152) &&
+  /@load="onPhotoLoad"/.test(detailSrc152) &&
+  /photoCache\.invalidate\(this\.city\.name\)/.test(detailSrc152));
+assert('1.6.1 地图页：onReady 起延迟 2000ms 调一次 photoCache.boost（幂等、失败静默）',
+  /setTimeout\(\(\) => \{[\s\S]{0,120}photoCache\.boost\(\)\.catch/.test(mapSrc) &&
+  /\}, 2000\);/.test(mapSrc) && /onReady\(\) \{[\s\S]{0,80}schedulePhotoPrefetch/.test(mapSrc));
+
+// 41.8 压缩脚本 + 待上传产物（与 CITY_PHOTOS 的 slug 一一对应）
+assert('1.6.1 压缩脚本：750px / WebP / q80 / 单张 200KB 上限，输出 city-photos-lite',
+  (() => {
+    const s = readFileSync(new URL('../scripts/compress-photos.mjs', import.meta.url), 'utf8');
+    return /const WIDTH = 750/.test(s) && /const QUALITY = 80/.test(s) && /const LIMIT_KB = 200/.test(s) &&
+      /'image\/webp'/.test(s) && /city-photos-lite/.test(s);
+  })());
+// 待上传目录在仓库外（图片不进代码仓库）；本机存在才校验，克隆下来没有就跳过
+const liteDir = new URL('../../photo-lite-upload/city-photos-lite/', import.meta.url);
+let liteNames = null;
+try { liteNames = (await import('node:fs')).readdirSync(liteDir).filter(f => f.endsWith('.webp')); } catch (e) {}
+if (liteNames) {
+  const wantLite = Object.keys(photos.CITY_PHOTOS).map(n => photos.CITY_PHOTOS[n].slug + '.webp').sort();
+  assert('1.6.1 待上传产物：30 张 .webp 与 30 个 slug 完全对应（city-photos-lite/）',
+    liteNames.length === 30 && JSON.stringify(liteNames.slice().sort()) === JSON.stringify(wantLite),
+    `n=${liteNames.length}`);
+} else {
+  console.log('· 跳过：待上传目录不在本机（photo-lite-upload/city-photos-lite/），仅校验压缩脚本');
+}
+
+/* ===== 42. 1.6.1 tfapi 行为验证：用假 wx-server-sdk 真跑一遍云函数 ===== */
+{
+  const { createRequire } = await import('node:module');
+  const { fileURLToPath } = await import('node:url');
+  const reqCF = createRequire(import.meta.url);
+  const Mod = reqCF('node:module');
+  const cloudBase = photos.PHOTO_BASE.replace(/\/city-photos\/$/, '');
+  const existLite = new Set(photoKeys.map(n => photos.CITY_PHOTOS[n].slug).filter(sl => sl !== 'chengdu' && sl !== 'wuhan'));
+  const storeCalls = [];
+  const fakeSdk = {
+    DYNAMIC_CURRENT_ENV: 'env',
+    init() {},
+    getWXContext: () => ({ OPENID: 'o-test' }),
+    database: () => ({ collection: () => ({ where: () => ({ limit: () => ({ get: async () => ({ data: [] }) }) }) }) }),
+    getTempFileURL: async ({ fileList }) => {
+      storeCalls.push(fileList.slice());
+      return {
+        fileList: fileList.map(fileID => {
+          const m = /\/city-photos(-lite)?\/([A-Za-z0-9_-]+)\.(?:jpg|webp)$/.exec(fileID);
+          if (!m) return { fileID, status: -1 };
+          const lite = !!m[1];
+          if (lite && !existLite.has(m[2])) return { fileID, status: -1, errmsg: 'STORAGE_FILE_NONEXIST' };
+          return { fileID, status: 0, tempFileURL: 'https://cdn.tcb.qcloud.la/' + (lite ? 'lite' : 'orig') + '/' + m[2] + (lite ? '.webp' : '.jpg') };
+        })
+      };
+    }
+  };
+  const origLoad = Mod._load;
+  Mod._load = function (request) { return request === 'wx-server-sdk' ? fakeSdk : origLoad.apply(this, arguments); };
+  let tfMain;
+  try {
+    tfMain = reqCF(fileURLToPath(new URL('../cloudfunctions/tfapi/index.js', import.meta.url))).main;
+  } finally {
+    Mod._load = origLoad;
+  }
+
+  const one = await tfMain({ action: 'photoUrl', fileID: cloudBase + '/city-photos/beijing.jpg' });
+  assert('1.6.1 tfapi 实跑：默认返回 lite 压缩图链接（.webp）并带 expireAt',
+    one.ok && one.size === 'lite' && /\/lite\/beijing\.webp$/.test(one.url) &&
+    typeof one.expireAt === 'number' && one.expireAt > Date.now() + 20 * 60000,
+    JSON.stringify(one));
+  const miss = await tfMain({ action: 'photoUrl', fileID: cloudBase + '/city-photos/chengdu.jpg' });
+  assert('1.6.1 tfapi 实跑：lite 文件不存在时回退原图（size=orig，不报错）',
+    miss.ok && miss.size === 'orig' && /\/orig\/chengdu\.jpg$/.test(miss.url), JSON.stringify(miss));
+
+  storeCalls.length = 0;
+  const allIds = photoKeys.map(n => cloudBase + '/city-photos/' + photos.CITY_PHOTOS[n].slug + '.jpg');
+  const batch = await tfMain({ action: 'photoUrls', fileIDs: allIds });
+  const liteN = batch.items.filter(i => i.size === 'lite').length;
+  const origN = batch.items.filter(i => i.size === 'orig').length;
+  assert('1.6.1 tfapi 实跑：30 城批量一次返回全部链接（28 lite + 2 原图回退，无空条）',
+    batch.ok && batch.items.length === 30 && liteN === 28 && origN === 2 &&
+    batch.items.every(i => !!i.url),
+    `lite=${liteN} orig=${origN}`);
+  assert('1.6.1 tfapi 实跑：批量只打 2 次存储接口（整批 lite + 缺失整批 orig），fileID 与入参一一对应',
+    storeCalls.length === 2 && storeCalls[0].length === 30 && storeCalls[1].length === 2 &&
+    allIds.every((id, i) => batch.items[i].fileID === id),
+    'calls=' + storeCalls.length);
+  assert('1.6.1 tfapi 实跑：非 cloud:// 的 fileID 一律拒绝；重复 fileID 去重',
+    (await tfMain({ action: 'photoUrl', fileID: 'https://evil/x.jpg' })).ok === false &&
+    (await tfMain({ action: 'photoUrls', fileIDs: allIds.concat(allIds) })).items.length === 30);
+}
 
 console.log(process.exitCode ? '\n== 存在失败项 ==' : '\n== 全部通过 ==');
